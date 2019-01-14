@@ -1,7 +1,4 @@
-require "rpm/librpm"
-
-require "rpm/db"
-require "rpm/file"
+require "./rpm/**"
 
 module RPM
   # Runtime Version of RPM Library (RPM::PKGVERSION is compile-time version)

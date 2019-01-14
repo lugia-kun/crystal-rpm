@@ -1,6 +1,3 @@
-require "rpm/librpm"
-require "rpm/transaction"
-
 module RPM
   class DB
     include Enumerable(DB)

@@ -1,9 +1,3 @@
-require "rpm/librpm"
-require "rpm/version"
-require "rpm/dependency"
-require "rpm/file"
-require "rpm/transaction"
-
 module RPM
   class ChangeLog
     property time : Time
@@ -105,17 +99,19 @@ module RPM
                else
                  FileAttrs.from_value(flaglist.as(Array(UInt32))[i])
                end
-        RPM::File.new(path: ::File.join(dirnames[diridxs[i]], basename),
-                      md5sum: md5list[i],
-                      link_to: linklist[i],
-                      size: sizelist[i],
-                      mtime: Time.unix(mtimelist[i]),
-                      owner: ownerlist[i],
-                      group: grouplist[i],
-                      mode: modelist[i],
-                      attr: attr,
-                      state: state,
-                      rdev: rdevlist[i])
+        RPM::File.new(
+          path: ::File.join(dirnames[diridxs[i]], basename),
+          md5sum: md5list[i],
+          link_to: linklist[i],
+          size: sizelist[i],
+          mtime: Time.unix(mtimelist[i]),
+          owner: ownerlist[i],
+          group: grouplist[i],
+          mode: modelist[i],
+          attr: attr,
+          state: state,
+          rdev: rdevlist[i]
+        )
       end
     end
 
@@ -138,12 +134,13 @@ module RPM
 
         # LibRPM.rpmtdInit(nametd)
         while LibRPM.rpmtdNext(nametd) != -1
-          deps << T.new(String.new(LibRPM.rpmtdGetString(nametd)),
-                        Version.new(String.new(LibRPM.rpmtdNextString(versiontd))),
-                        Sense.from_value(LibRPM.rpmtdNextUint32(flagtd).value), self)
+          deps << T.new(
+            String.new(LibRPM.rpmtdGetString(nametd)),
+            Version.new(String.new(LibRPM.rpmtdNextString(versiontd))),
+            Sense.from_value(LibRPM.rpmtdNextUint32(flagtd).value), self
+          )
         end
         deps
-
       ensure
         LibRPM.rpmtdFree(nametd) if nametd
         LibRPM.rpmtdFree(versiontd) if versiontd
@@ -245,6 +242,3 @@ module RPM
     end
   end
 end
-
-pkg = RPM::Package.new("../../PKGS/x86_64/NetworkManager-vpnc-1.2.4-2m.mo8.x86_64.rpm")
-pp pkg.requires

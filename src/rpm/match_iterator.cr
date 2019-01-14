@@ -1,5 +1,3 @@
-require "rpm/librpm"
-
 module RPM
   class MatchIterator
     include Enumerable(MatchIterator)

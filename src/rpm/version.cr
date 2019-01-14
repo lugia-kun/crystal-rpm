@@ -1,5 +1,3 @@
-require "rpm/librpm"
-
 module RPM
   class Version
     include Comparable(Version)

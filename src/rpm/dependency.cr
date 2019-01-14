@@ -1,6 +1,3 @@
-require "rpm/librpm"
-require "rpm/version"
-
 module RPM
   class Package
   end

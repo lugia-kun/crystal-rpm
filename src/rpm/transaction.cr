@@ -1,8 +1,3 @@
-require "rpm/librpm"
-require "rpm/match_iterator"
-require "rpm/dependency"
-require "rpm/package"
-
 module RPM
   class DB
   end
