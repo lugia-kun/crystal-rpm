@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Crystal::Rpm do
+describe RPM do
   # TODO: Write tests
 
   it "works" do
