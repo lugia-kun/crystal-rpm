@@ -1,0 +1,9 @@
+name: crystal-rpm
+version: 0.1.0
+
+authors:
+  - Hajime Yoshimori <lugia.kun@gmail.com>
+
+crystal: 0.27.0
+
+license: MIT
