@@ -7,7 +7,7 @@ The [rpm] binding based on [ruby-rpm-ffi].
 1. Add the dependency to your `shard.yml`:
 ```yaml
 dependencies:
-  crystal-rpm:
+  rpm:
     github: lugia-kun/crystal-rpm
 ```
 2. Run `shards install`
@@ -15,7 +15,7 @@ dependencies:
 ## Usage
 
 ```crystal
-require "crystal-rpm"
+require "rpm"
 ```
 
 TODO: Write usage instructions here
