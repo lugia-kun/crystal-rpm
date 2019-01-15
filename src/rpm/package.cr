@@ -31,6 +31,10 @@ module RPM
       Package.new(hdr)
     end
 
+    def self.open(filename : String)
+      Package.new(filename)
+    end
+
     def initialize(hdr : LibRPM::Header)
       if hdr.null?
         @hdr = LibRPM.headerNew
@@ -68,6 +72,10 @@ module RPM
 
     def signature
       sprintf("%{sigmd5}")
+    end
+
+    def name
+      self[Tag::Name].as(String)
     end
 
     def files

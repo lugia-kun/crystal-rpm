@@ -563,7 +563,7 @@ module RPM
     fun headerPut(Header, TagData, HeaderPutFlags) : Int
     fun headerPutString(Header, TagVal, UInt8*) : Int
     fun headerPutUint32(Header, TagVal, UInt32*, Count) : Int
-    fun headerFormat(Header, TagVal, UInt8*, ErrorMsg*) : Pointer(UInt8)
+    fun headerFormat(Header, UInt8*, ErrorMsg*) : Pointer(UInt8)
 
     fun rpmReadPackageFile(Transaction, FD, UInt8*, Header*) : RC
 

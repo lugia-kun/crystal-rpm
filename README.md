@@ -1,6 +1,8 @@
 # crystal-rpm
 
-The [rpm] binding based on [ruby-rpm-ffi].
+The [RPM] bindings for [Crystal] language based on [ruby-rpm-ffi].
+
+It supports RPM 4.8.0 or later.
 
 ## Installation
 
@@ -36,5 +38,6 @@ TODO: Write development instructions here
 
 - [Hajime Yoshimori](https://github.com/lugia-kun) - creator and maintainer
 
-[rpm]: http://rpm.org/
+[RPM]: http://rpm.org/
+[Crystal]: https://crystal-lang.org/
 [ruby-rpm-ffi]: https://github.com/dmacvicar/ruby-rpm-ffi
