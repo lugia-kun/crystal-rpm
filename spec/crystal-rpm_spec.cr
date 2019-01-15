@@ -1,8 +1,6 @@
 require "./spec_helper"
 
 describe RPM::Package do
-  data_dir = File.join(File.dirname(__FILE__), "data")
-
   it "creates a package like" do
     pkg = RPM::Package.create("foo", RPM::Version.new("1.0"))
     pkg.name.should eq("foo")
@@ -10,7 +8,7 @@ describe RPM::Package do
   end
 
   it "opens a simple package and ..." do
-    pkg = RPM::Package.open(File.join(data_dir, "simple-1.0-0.i586.rpm"))
+    pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
 
     pkg.signature.should eq("3b5f9d468c877166532c662e29f43bc3")
     pkg[RPM::Tag::Name].should eq("simple")
