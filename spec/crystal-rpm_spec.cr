@@ -18,7 +18,6 @@ describe "RPM::Lib" do
     RPM::LibRPM.headerFree(ptr)
   end
 
-  # TODO: DB entry is empty unless `%{_dbpath}` is correctly set.
   it "create/free a transaction" do
     ts = RPM::LibRPM.rpmtsCreate
     RPM::LibRPM.rpmtsSetRootDir(ts, "/")
@@ -26,14 +25,19 @@ describe "RPM::Lib" do
     hdrs = [] of RPM::LibRPM::Header
     until (hdr = RPM::LibRPM.rpmdbNextIterator(iter)).null?
       hdrs << hdr
-      RPM::LibRPM.headerGetAsString(hdr, RPM::Tag::Name)
+      ptr = RPM::LibRPM.headerGetAsString(hdr, RPM::Tag::Name)
+      begin
+        str = String.new(ptr)
+      ensure
+        LibC.free(ptr)
+      end
     end
   ensure
     RPM::LibRPM.rpmdbFreeIterator(iter) if iter
     RPM::LibRPM.rpmtsFree(ts) if ts
   end
 
-  pending "macrofiles is set" do
+  it "macrofiles is set" do
     RPM::MACROFILES.should start_with("")
   end
 end
@@ -142,6 +146,47 @@ describe RPM::Package do
       # but RPM API returns an empty string, so we decided to keep it
       # as-is.
       file.link_to.should eq("")
+    end
+  end
+
+  pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+  describe "dependencies of #{pkg}" do
+    it "has a known name" do
+      pkg.name.should eq("simple_with_deps")
+    end
+
+    it "provides \"simple_with_deps(x86-32)\"" do
+      pkg.provides.any? { |x| x.name == "simple_with_deps(x86-32)" }.should be_true
+    end
+
+    it "provides \"simple_with_deps\"" do
+      pkg.provides.any? { |x| x.name == "simple_with_deps" }.should be_true
+    end
+
+    it "requires \"a\"" do
+      pkg.requires.any? { |x| x.name == "a" }.should be_true
+    end
+
+    b = pkg.requires.find { |x| x.name == "b" }
+    it "requires \"b\"" do
+      b.should be_truthy
+    end
+
+    it "requires \"b-1.0\"" do
+      req = b.as(RPM::Require)
+      req.version.to_s.should eq("1.0")
+    end
+
+    it "conflicts with \"c\"" do
+      pkg.conflicts.any? { |x| x.name == "c" }.should be_true
+    end
+
+    it "conflicts with \"d\"" do
+      pkg.conflicts.any? { |x| x.name == "d" }.should be_true
+    end
+
+    it "obsoletes \"f\"" do
+      pkg.obsoletes.any? { |x| x.name == "f" }.should be_true
     end
   end
 end

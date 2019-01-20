@@ -776,6 +776,9 @@ module RPM
     fun rpmtsCreate : Transaction
     fun rpmtsAddInstallElement(Transaction, Header, FnpyKey, Int, Relocation) : Int
     fun rpmtsAddEraseElement(Transaction, Header, Int) : Int
+
+    # ## RC
+    fun rpmReadConfigFiles(UInt8*, UInt8*) : Int
   end # LibRPM
 
   # Exposed Types

@@ -168,8 +168,8 @@ module RPM
       dependencies(Provide)
     end
 
-    def obsolstes
-      dependencies(Obsolste)
+    def obsoletes
+      dependencies(Obsolete)
     end
 
     def conflicts
