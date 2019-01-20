@@ -35,7 +35,7 @@ module RPM
       e, @v, @r = Version.parse_evr(str)
     end
 
-    def initialize(@v : String, @r : String, @e : Int32)
+    def initialize(@v : String, @r : String, @e : Int32? = nil)
     end
 
     def <=>(other : Version)

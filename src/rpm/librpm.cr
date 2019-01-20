@@ -119,11 +119,26 @@ module RPM
       CONFIG        = (1_u32 << 28)
     end
 
-    fun rpmdsSingle(TagVal, UInt8*, UInt8*, Sense) : RPMDs
-    fun rpmdsCompare(RPMDs) : Int
+    fun rpmdsSingle(TagVal, UInt8*, UInt8*, Sense) : DependencySet
+    fun rpmdsCompare(DependencySet, DependencySet) : Int
+    fun rpmdsCount(DependencySet) : Int
+    fun rpmdsCurrent(DependencySet) : DependencySet
+    fun rpmdsInstance(DependencySet) : UInt
+    fun rpmdsIx(DependencySet) : Int
+    fun rpmdsSetIx(DependencySet, Int) : Int
+    fun rpmdsFree(DependencySet) : DependencySet
+    fun rpmdsLink(DependencySet) : DependencySet
+    fun rpmdsMerge(DependencySet*, DependencySet) : Int
+    fun rpmdsTagN(DependencySet) : TagVal
+    fun rpmdsTagTi(DependencySet) : TagVal
+    fun rpmdsTi(DependencySet) : Int
+    fun rpmdsN(DependencySet) : UInt8*
+    fun rpmdsDNEVR(DependencySet) : UInt8*
+    fun rpmdsNext(DependencySet) : Int
 
     # ## File Info Set APIs.
 
+    @[Flags]
     enum FileAttrs : RPMFlags
       NONE      = 0
       CONFIG    = (1_u32 << 0)
@@ -135,6 +150,8 @@ module RPM
       GHOST     = (1_u32 << 6)
       LICENSE   = (1_u32 << 7)
       README    = (1_u32 << 8)
+      EXCLUDE   = (1_u32 << 9)
+      UNPATCHED = (1_u32 << 10)
       PUBKEY    = (1_u32 << 11)
     end
 
@@ -624,6 +641,7 @@ module RPM
     fun delMacro(MacroContext, UInt8*) : Int
 
     # ## Problem APIs.
+
     @[Flags]
     enum ProbFilterFlags : RPMFlags
       NONE            = 0
@@ -774,22 +792,33 @@ module RPM
   alias Sense = LibRPM::Sense
 
   macro _version_depends(version)
-    PKGVERSION = version
+    # The version of librpm which is linked against
+    PKGVERSION = {{version}}
+
+    {% a = version.split(".") %}
+    {% version_code = ((a[0].to_i << 16) + (a[1].to_i << 8) + (a[2].to_i)) %}
+
+    # Numerical representation of `PKGVERSION`
+    PKGVERSION_CODE = {{ version_code }}
 
     {% if compare_versions(version, "4.9.0") >= 0 %}
+      # Return Tag Type for a Tag
       def self.tag_type(v) : TagType
         LibRPM.rpmTagType(v)
       end
 
+      # Return Tag Return Type for a tag
       def self.tag_get_return_type(v) : TagReturnType
         LibRPM.rpmTagGetReturnType(v)
       end
     {% else %}
+      # Return Tag Type for a Tag
       def self.tag_type(v) : TagType
         m = LibRPM.rpmTagGetType(v)
         TagType.new((m & ~TagReturnType::MASK.value).to_i32)
       end
 
+      # Return Tag Return Type for a tag
       def self.tag_get_return_type(v) : TagReturnType
         m = LibRPM.rpmTagGetType(v)
         TagReturnType.new(m & TagReturnType::MASK.value)
