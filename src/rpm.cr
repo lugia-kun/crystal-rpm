@@ -8,7 +8,7 @@ module RPM
   RPMVERSION = String.new(LibRPM.rpmversion)
 
   def self.rpm_version_code : UInt32
-    maj, min, pat = RPMVERSION.split(".", 3)
+    maj, min, pat = RPMVERSION.split(".")
     (maj.to_u32 << 16) + (min.to_u32 << 8) + (pat.to_u32)
   end
 
