@@ -4,4 +4,4 @@ before_install:
 script:
   - sudo rpm -i spec/data/simple-1.0-0.i586.rpm
   - shards install
-  - fakechroot crystal spec
+  - fakechroot crystal spec -d
