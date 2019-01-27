@@ -9,6 +9,8 @@ module RPM
   end
 
   class Package
+    getter hdr : LibRPM::Header
+
     def self.create(name : String, version : Version)
       hdr = LibRPM.headerNew
       if LibRPM.headerPutString(hdr, Tag::Name, name) != 1

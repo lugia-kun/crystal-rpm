@@ -20,7 +20,7 @@ module RPM
     type DatabaseMatchIterator = Pointer(Void)
     type MacroContext = Pointer(Void)
     type Problem = Pointer(Void)
-    type FnpyKey = Pointer(Void)
+    alias FnpyKey = Pointer(Void)
     type DependencySet = Pointer(Void)
     type ProblemSet = Pointer(Void)
     type ProblemSetIterator = Pointer(Void)
@@ -66,10 +66,10 @@ module RPM
     end
 
     alias CallbackData = Pointer(Void)
-    type CallbackFunction = (Void*, CallbackType, Loff, Loff, CallbackData) -> Pointer(Void)
+    alias CallbackFunction = (LibRPM::Header, CallbackType, Loff, Loff, FnpyKey, CallbackData) -> Pointer(Void)
 
     # ## CLI APIs.
-    fun rpmShowProgress(Void*, CallbackType, Loff, Loff, FnpyKey, Void*) : Pointer(Void)
+    fun rpmShowProgress(LibRPM::Header, CallbackType, Loff, Loff, FnpyKey, Void*) : Pointer(Void)
 
     # ## DB APIs.
 
@@ -748,7 +748,10 @@ module RPM
 
     fun rpmtsCheck(Transaction) : Int
     fun rpmtsOrder(Transaction) : Int
+
+    @[Raises]
     fun rpmtsRun(Transaction, ProblemSet, ProbFilterFlags) : Int
+
     fun rpmtsLink(Transaction) : Transaction
     fun rpmtsCloseDB(Transaction) : Int
     fun rpmtsOpenDB(Transaction, Int) : Int
@@ -793,6 +796,8 @@ module RPM
   alias FileAttrs = LibRPM::FileAttrs
 
   alias Sense = LibRPM::Sense
+  alias TransactionFlags = LibRPM::TransFlags
+  alias MireMode = LibRPM::MireMode
 
   macro _version_depends(version)
     # The version of librpm which is linked against

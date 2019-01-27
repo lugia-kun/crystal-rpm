@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "file_utils"
 
 describe RPM do
   puts "Using RPM version #{RPM::PKGVERSION}"
@@ -189,4 +190,94 @@ describe RPM::Package do
       pkg.obsoletes.any? { |x| x.name == "f" }.should be_true
     end
   end
+end
+
+tmproot = File.join(File.dirname(__FILE__), "work")
+Dir.mkdir(tmproot)
+begin
+  describe RPM::Transaction do
+    describe "#root_dir" do
+      RPM.transaction do |ts|
+        it "has default root directory \"/\"" do
+          ts.root_dir.should eq("/")
+        end
+        it "has been set to root directory \"#{tmproot}\"" do
+          ts.root_dir = tmproot
+          ts.root_dir.should eq(tmproot + "/")
+        end
+      end
+    end
+
+    describe "#flags" do
+      RPM.transaction do |ts|
+        it "has default transaction flag NONE" do
+          ts.flags.should eq(RPM::TransactionFlags::NONE)
+        end
+        ts.flags = RPM::TransactionFlags::TEST
+        it "has now tranaction flag TEST" do
+          ts.flags.should eq(RPM::TransactionFlags::TEST)
+        end
+      end
+    end
+
+    describe "Test install" do
+      path = fixture("simple-1.0-0.i586.rpm")
+      pkg = RPM::Package.open(path)
+      RPM.transaction(tmproot) do |ts|
+        begin
+          ts.install(pkg, path)
+          ts.commit
+        ensure
+          ts.db.close
+        end
+      end
+      describe "#install-ed \"#{pkg[RPM::Tag::Name]}\"" do
+        test_path = File.join(tmproot, "usr/share/simple/README")
+        it "#{test_path} exists?" do
+          File.exists?(test_path).should be_true
+        end
+      end
+    end
+
+    describe "Test iterator" do
+      RPM.transaction do |ts|
+        describe "#init_iterator" do
+          iter = ts.init_iterator
+          it "returns MatchIterator" do
+            iter.class.should eq(RPM::MatchIterator)
+          end
+        end
+      end
+
+      a_installed_pkg = nil
+      RPM.transaction do |ts|
+        iter = ts.init_iterator
+        iter.each do |pkg|
+          a_installed_pkg = pkg
+          break
+        end
+      end
+      if a_installed_pkg.nil?
+        STDERR.puts "No packages installed in your system!!"
+      else
+        # Uses an installed package as an example
+        sample_pkg = a_installed_pkg.as(RPM::Package)
+        RPM.transaction do |ts|
+          vers = sample_pkg[RPM::Tag::Version].as(String)
+          iter = ts.init_iterator
+          describe "#version" do
+            it "looks for packages whose version is \"#{vers}\"" do
+              iter.version(RPM::Version.new(vers))
+              iter.each do |sig|
+                sig[RPM::Tag::Version].should eq(vers)
+              end
+            end
+          end
+        end
+      end
+
+    end
+  end
+ensure
+  FileUtils.rm_rf(tmproot)
 end
