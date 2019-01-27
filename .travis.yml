@@ -1,7 +1,7 @@
 language: crystal  
 before_install:
   - sudo apt-get install -y fakechroot rpm librpm-dev
-script:
-  - sudo rpm -i spec/data/simple-1.0-0.i586.rpm
-  - shards install
-  - fakechroot crystal spec -d
+# script:
+#   - sudo rpm -i spec/data/simple-1.0-0.i586.rpm
+#   - shards install
+#   - fakechroot crystal spec -d
