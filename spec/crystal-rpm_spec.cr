@@ -1,5 +1,5 @@
 require "./spec_helper"
-require "file_utils"
+require "tempdir"
 
 describe RPM do
   puts "Using RPM version #{RPM::PKGVERSION}"
@@ -105,6 +105,9 @@ describe RPM::Package do
     it "has a description" do
       pkg[RPM::Tag::Description].should eq("Dummy package")
     end
+    it "has a signature" do
+      pkg[RPM::Tag::SigMD5].should eq(Bytes[0x3b, 0x5f, 0x9d, 0x46, 0x8c, 0x87, 0x71, 0x66, 0x53, 0x2c, 0x66, 0x2e, 0x29, 0xf4, 0x3b, 0xc3])
+    end
 
     ENV["LC_ALL"] = "es_ES.UTF-8"
 
@@ -192,34 +195,32 @@ describe RPM::Package do
   end
 end
 
-tmproot = File.join(File.dirname(__FILE__), "work")
-Dir.mkdir(tmproot)
-begin
-  describe RPM::Transaction do
-    describe "#root_dir" do
-      RPM.transaction do |ts|
-        it "has default root directory \"/\"" do
-          ts.root_dir.should eq("/")
-        end
-        it "has been set to root directory \"#{tmproot}\"" do
-          ts.root_dir = tmproot
-          ts.root_dir.should eq(tmproot + "/")
-        end
+describe RPM::Transaction do
+  describe "#root_dir" do
+    RPM.transaction do |ts|
+      it "has default root directory \"/\"" do
+        ts.root_dir.should eq("/")
+      end
+      it "has been set to root directory \"#{Dir.tempdir}\"" do
+        ts.root_dir = Dir.tempdir
+        ts.root_dir.should eq(Dir.tempdir + "/")
       end
     end
+  end
 
-    describe "#flags" do
-      RPM.transaction do |ts|
-        it "has default transaction flag NONE" do
-          ts.flags.should eq(RPM::TransactionFlags::NONE)
-        end
-        ts.flags = RPM::TransactionFlags::TEST
-        it "has now tranaction flag TEST" do
-          ts.flags.should eq(RPM::TransactionFlags::TEST)
-        end
+  describe "#flags" do
+    RPM.transaction do |ts|
+      it "has default transaction flag NONE" do
+        ts.flags.should eq(RPM::TransactionFlags::NONE)
+      end
+      ts.flags = RPM::TransactionFlags::TEST
+      it "has now tranaction flag TEST" do
+        ts.flags.should eq(RPM::TransactionFlags::TEST)
       end
     end
+  end
 
+  Dir.mktmpdir do |tmproot|
     describe "Test install" do
       path = fixture("simple-1.0-0.i586.rpm")
       pkg = RPM::Package.open(path)
@@ -252,32 +253,88 @@ begin
       a_installed_pkg = nil
       RPM.transaction do |ts|
         iter = ts.init_iterator
-        iter.each do |pkg|
-          a_installed_pkg = pkg
-          break
+        a_installed_pkg = iter.first
+      end
+      dir = "/"
+      if a_installed_pkg.nil?
+        dir = tmproot
+        RPM.transaction(dir) do |ts|
+          iter = ts.init_iterator
+          a_installed_pkg = iter.first
         end
       end
-      if a_installed_pkg.nil?
-        STDERR.puts "No packages installed in your system!!"
-      else
-        # Uses an installed package as an example
-        sample_pkg = a_installed_pkg.as(RPM::Package)
-        RPM.transaction do |ts|
-          vers = sample_pkg[RPM::Tag::Version].as(String)
-          iter = ts.init_iterator
-          describe "#version" do
-            it "looks for packages whose version is \"#{vers}\"" do
-              iter.version(RPM::Version.new(vers))
-              iter.each do |sig|
-                sig[RPM::Tag::Version].should eq(vers)
-              end
+      # Uses an installed package as an example
+      sample_pkg = a_installed_pkg.as(RPM::Package)
+      RPM.transaction(dir) do |ts|
+        vers = sample_pkg[RPM::Tag::Version].as(String)
+        iter = ts.init_iterator
+        describe "#version" do
+          it "looks for packages whose version is \"#{vers}\"" do
+            iter.version(RPM::Version.new(vers))
+            iter.each do |sig|
+              sig[RPM::Tag::Version].should eq(vers)
             end
           end
         end
       end
 
+      name = sample_pkg[RPM::Tag::Name].as(String)
+      patname = name[0..1]
+      pat = patname + "*"
+      RPM.transaction(dir) do |ts|
+        iter = ts.init_iterator
+        iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pat)
+        describe "#regexp" do
+          it "looks for packages whose name matches \"#{pat}\"" do
+            iter.each do |pkg|
+              pkg[RPM::Tag::Name].as(String).should start_with(patname)
+            end
+          end
+        end
+      end
+    end
+
+    describe "Test remove" do
+      # path = fixture("simple-1.0-0.i586.rpm")
+      # pkg = RPM::Package.open(path)
+      # RPM.transaction(tmproot) do |ts|
+      #   begin
+      #     ts.install(pkg, path)
+      #     ts.commit
+      #   ensure
+      #     ts.db.close
+      #   end
+      # end
+
+      RPM.transaction(tmproot) do |ts|
+        iter = ts.init_iterator
+        iter.regexp(RPM::DbiTag::Name, RPM::MireMode::DEFAULT, "simple")
+        n = false
+        iter.each do |pkg|
+          if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+             pkg[RPM::Tag::Release].as(String) == "0" &&
+             pkg[RPM::Tag::Arch].as(String) == "i586"
+            ts.delete(pkg)
+            n = true
+          end
+        end
+        raise Exception.new("No packages found to remove!") unless n
+
+        begin
+          ts.order
+          ts.clean
+
+          ts.commit
+        ensure
+          ts.db.close
+        end
+      end
+      describe "#remove-ed properly" do
+        test_path = File.join(tmproot, "usr/share/simple/README")
+        it "#{test_path} exists?" do
+          File.exists?(test_path).should be_false
+        end
+      end
     end
   end
-ensure
-  FileUtils.rm_rf(tmproot)
 end

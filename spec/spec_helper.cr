@@ -1,4 +1,5 @@
 require "spec"
+require "file_utils"
 require "../src/rpm"
 
 def fixture(name : String) : String

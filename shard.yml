@@ -1,6 +1,10 @@
 name: rpm
 version: 0.1.0
 
+dependencies:
+  tempdir:
+    github: lugia-kun/tempdir
+
 authors:
   - Hajime Yoshimori <lugia.kun@gmail.com>
 

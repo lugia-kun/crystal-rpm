@@ -1,3 +1,5 @@
+require "base64"
+
 module RPM
   class ChangeLog
     property time : Time
@@ -243,8 +245,13 @@ module RPM
           get_tag_data(tagc, true) do
             String.new(LibRPM.rpmtdGetString(tagc))
           end
+        when TagType::BIN
+          s = LibRPM.rpmtdFormat(tagc, LibRPM::TagDataFormat::BASE64, nil)
+          str = String.new(s)
+          LibC.free(s)
+          Base64.decode(str)
         else
-          raise Exception.new("Don't know hot to retrieve #{type}")
+          raise Exception.new("Don't know how to retrieve #{type}")
         end
       ensure
         LibRPM.rpmtdFree(tagc)

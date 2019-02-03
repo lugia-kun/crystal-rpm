@@ -5,6 +5,7 @@ module RPM
   class Transaction
     getter ptr : LibRPM::Transaction
     property fdt : LibRPM::FD? = nil
+    @db : DB? = nil
 
     def initialize(**opts)
       @keys = Set(String).new
@@ -21,7 +22,8 @@ module RPM
     end
 
     def finalize
-      LibRPM.rpmtsFree(@ptr)
+      LibRPM.rpmtsFree(@ptr) unless @ptr.null?
+      @ptr = LibRPM::Transaction.null
     end
 
     def init_iterator
@@ -29,8 +31,12 @@ module RPM
       init_iterator(DbiTag::Packages, nil)
     end
 
-    def init_iterator(tag : DbiTag | DbiTagValue, val : String? = nil)
-      it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, val, 0)
+    def init_iterator(tag : DbiTag | DbiTagValue, val : String | Slice(UInt8) | Nil = nil)
+      if val
+        it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, val, val.size)
+      else
+        it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, nil, 0)
+      end
       if it_ptr.null?
         raise Exception.new("Can't init iterator for [#{tag}] -> '#{val}'")
       end
@@ -38,11 +44,12 @@ module RPM
       MatchIterator.new(it_ptr)
     end
 
+    def each_match(key, val)
+      init_iterator(key, val)
+    end
+
     def each_match(key, val, &block)
       itr = init_iterator(key, val)
-
-      return itr unless block_given?
-
       itr.each(&block)
     end
 
@@ -60,17 +67,19 @@ module RPM
 
     def delete_by_iterator(iter : MatchIterator)
       iter.each do |header|
-        ret = RPM.rpmtsAddEraseElement(@ptr, header.ptr, iterator.offset)
+        ret = LibRPM.rpmtsAddEraseElement(@ptr, header.hdr, iter.offset)
         raise Exception.new("Error while adding erase to transaction") if ret != 0
       end
     end
 
     def delete(pkg : Package)
-      iter = if pkg[DbiTag::SigMD5]
-               each_match(DbiTag::SigMD5, pkg[DbiTag::SigMD5])
-             else
-               each_match(DbiTag::Label, pkg[DbiTag::Label])
-             end
+      sigmd5 = pkg[DbiTag::SigMD5]
+      if !sigmd5.as(Slice(UInt8)).empty?
+        iter = each_match(DbiTag::SigMD5, sigmd5.as(Slice(UInt8)))
+      else
+        labl = pkg[DbiTag::Label].as(String)
+        iter = each_match(DbiTag::Label, labl)
+      end
 
       delete_by_iterator(iter)
     end
@@ -83,6 +92,21 @@ module RPM
     def delete(pkg : Dependency)
       iter = each_match(DbiTag::Label, pkg.name).set_iterator_version(pkg.version)
       delete_by_iterator(iter)
+    end
+
+    # Determine package order in the transaction according to
+    # dependencies
+    #
+    # The final order ends up as installed packages followed by
+    # removed packages, with packages removed for upgrades immediately
+    # following the new package to be installed.
+    def order
+      LibRPM.rpmtsOrder(@ptr)
+    end
+
+    # Free memory needed only for dependency checks and ordering
+    def clean
+      LibRPM.rpmtsClean(@ptr)
     end
 
     def root_dir=(dir : String | UInt8*)
@@ -102,7 +126,8 @@ module RPM
     end
 
     def db
-      DB.new(self)
+      @db ||= DB.new(self)
+      @db.as(DB)
     end
 
     def install_element(pkg : Package, key : String, **opts)
@@ -208,6 +233,16 @@ module RPM
         if rc < 0
           msg = String.new(LibRPM.rpmlogMessage)
           raise Exception.new("#{self}: #{msg}")
+        end
+        if rc > 0
+          ps = LibRPM.rpmtsProblems(@ptr)
+          psi = LibRPM.rpmpsInitIterator(ps)
+          while LibRPM.rpmpsNextIterator(psi) >= 0
+            problem = Problem.from_ptr(LibRPM.rpmpsGetProblem(psi))
+            STDERR.puts problem.str
+          end
+          LibRPM.rpmpsFreeIterator(psi)
+          LibRPM.rpmpsFree(ps)
         end
       end
     end

@@ -15,7 +15,7 @@ module RPM
 
     type Header = Pointer(Void)
     type HeaderIterator = Pointer(Void)
-    type Transaction = Pointer(Void)
+    alias Transaction = Pointer(Void)
     type Database = Pointer(Void)
     type DatabaseMatchIterator = Pointer(Void)
     type MacroContext = Pointer(Void)
@@ -686,6 +686,7 @@ module RPM
     fun rpmpsNextIterator(ProblemSetIterator) : Int
     fun rpmpsGetProblem(ProblemSetIterator) : Problem
     fun rpmpsFree(ProblemSet) : ProblemSet
+    fun rpmpsFreeIterator(ProblemSetIterator) : ProblemSetIterator
 
     # ## TagData APIs.
 
@@ -715,6 +716,31 @@ module RPM
     fun rpmtdFromUint64(TagData, TagVal, UInt64*, Count) : Int
     fun rpmtdFromString(TagData, TagVal, UInt8*) : Int
     fun rpmtdFromStringArray(TagData, TagVal, UInt8**, Count) : Int
+
+    enum TagDataFormat
+      STRING
+      ARMOR
+      BASE64
+      PGPSIG
+      DEPFLAGS
+      FFLAGS
+      PERMS
+      TRIGGERTYPE
+      XML
+      OCTAL
+      HEX
+      DATE
+      DAY
+      SHESCAPE
+      ARRAYSIZE
+      DEPTYPE
+      FSTATE
+      VFLAGS
+      EXPAND
+      FSTATUS
+    end
+
+    fun rpmtdFormat(TagData, TagDataFormat, UInt8*) : Pointer(UInt8)
 
     # ## Transaction APIs.
     @[Flags]
