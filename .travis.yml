@@ -1,10 +1,11 @@
 language: crystal  
 before_install:
-  - sudo apt-get install -y wget tar gcc make librpm-dev libnspr4-dev 
+  - sudo apt-get install -y wget tar gcc make librpm-dev libnspr4-dev
   - |
     wget http://ftp.rpm.org/releases/rpm-4.8.x/rpm-4.8.1.tar.bz2 && \
     tar xf rpm-4.8.1.tar.bz2 && \
     cd rpm-4.8.1 && \
+    export CPPFLAGS='-I/usr/include/nss -I/usr/include/nspr4' && \
     ./configure --prefix=/opt/rpm/4.8 && \
     make install
 script:
