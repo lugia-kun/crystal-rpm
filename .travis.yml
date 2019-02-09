@@ -1,5 +1,11 @@
 language: crystal  
 before_install:
-  - sudo apt-get install -y librpm-dev
+  - sudo apt-get install -y wget tar gcc make librpm-dev
+  - |
+    wget http://ftp.rpm.org/releases/rpm-4.8.x/rpm-4.8.1.tar.bz2 && \
+    tar xf rpm-4.8.1.tar.bz2 && \
+    cd rpm-4.8.1 && \
+    ./configure --prefix=/opt/rpm/4.8 && \
+    make install
 script:
   - sudo crystal spec -d
