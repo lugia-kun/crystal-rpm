@@ -5,7 +5,7 @@ before_install:
     wget http://ftp.rpm.org/releases/rpm-4.8.x/rpm-4.8.1.tar.bz2 && \
     tar xf rpm-4.8.1.tar.bz2 && \
     cd rpm-4.8.1 && \
-    export CPPFLAGS='-I/usr/include/nss -I/usr/include/nspr4' && \
+    export CPPFLAGS='-I/usr/include/nss -I/usr/include/nspr' && \
     ./configure --prefix=/opt/rpm/4.8 && \
     make install
 script:
