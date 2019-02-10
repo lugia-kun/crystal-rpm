@@ -1,12 +1,23 @@
-language: crystal  
-before_install:
-  - sudo apt-get install -y wget tar gcc make librpm-dev libnspr4-dev libnss3-dev libdwarf-dev libelf-dev libmagic-dev
-  - |
-    wget http://ftp.rpm.org/releases/rpm-4.8.x/rpm-4.8.1.tar.bz2 && \
-    tar xf rpm-4.8.1.tar.bz2 && \
-    cd rpm-4.8.1 && \
-    export CPPFLAGS='-I/usr/include/nss -I/usr/include/nspr' && \
-    ./configure --prefix=/opt/rpm/4.8 && \
-    make install
+language: crystal
+services:
+  - docker
+env:
+  # - BASE_IMAGE=centos:5 # rpm 4.4.0
+  - BASE_IMAGE=centos:6 # rpm 4.8.0
+  - BASE_IMAGE=centos:7 # rpm 4.11.3
+  # - BASE_IMAGE=fedora:20 # rpm 4.11.3
+  - BASE_IMAGE=fedora:21 # rpm 4.12.0.1
+  # - BASE_IMAGE=fedora:22 # rpm 4.12.0.1
+  # - BASE_IAMGE=fedora:23 # rpm 4.13.0-rc1
+  # - BASE_IMAGE=fedora:24 # rpm 4.13.0-rc1
+  - BASE_IMAGE=fedora:25 # rpm 4.13.0.1
+  # - BASE_IMAGE=fedora:26 # rpm 4.13.0.2
+  - BASE_IMAGE=fedora:27 # rpm 4.14.1
+  - BASE_IMAGE=fedora:28 # rpm 4.14.2.1
+  # - BASE_IMAGE=fedora:29 # rpm 4.14.2.1
+  # - BASE_IMAGE=fedora:30 # rpm 4.14.2.1
+
 script:
-  - sudo crystal spec -d
+  - docker run $BASE_IMAGE sh -c "curl https://dist.crystal-lang.org/rpm/setup.sh | sudo bash"
+  - docker run $BASE_IMAGE sudo yum install -y rpm-devel crystal
+  - docker run -v $(pwd):/work -w /work $BASE_IMAGE sudo crystal spec -d
