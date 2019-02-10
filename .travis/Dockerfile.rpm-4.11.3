@@ -1,0 +1,4 @@
+From centos:7 AS rpm-4.11.3
+RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
+RUN yum install -y rpm-devel crystal which pkgconfig
+WORKDIR /work
