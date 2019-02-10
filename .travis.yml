@@ -18,6 +18,4 @@ env:
   # - BASE_IMAGE=fedora:30 # rpm 4.14.2.1
 
 script:
-  - docker run $BASE_IMAGE sh -c "curl https://dist.crystal-lang.org/rpm/setup.sh | bash"
-  - docker run $BASE_IMAGE yum install -y rpm-devel crystal
-  - docker run -v $(pwd):/work -w /work $BASE_IMAGE crystal spec -d
+  - docker run -v $(pwd):/work -w /work $BASE_IMAGE ./.docker-crystal-spec.sh
