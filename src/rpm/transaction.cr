@@ -152,6 +152,7 @@ module RPM
       def initialize(@pkg, @type, @amount, @total, @key)
       end
     end
+
     alias Callback = Proc((CallbackData?), IO::FileDescriptor | Pointer(Void))
 
     class CallbackBoxData
@@ -166,9 +167,7 @@ module RPM
       if closure
         box_data = CallbackBoxData.new(self, closure)
         box = Box.box(box_data)
-        callback = -> (hdr : LibRPM::Header, type : LibRPM::CallbackType,
-                       amount : LibRPM::Loff, total : LibRPM::Loff,
-                       key : LibRPM::FnpyKey, data : LibRPM::CallbackData) do
+        callback = ->(hdr : LibRPM::Header, type : LibRPM::CallbackType, amount : LibRPM::Loff, total : LibRPM::Loff, key : LibRPM::FnpyKey, data : LibRPM::CallbackData) do
           boxed = Box(CallbackBoxData).unbox(data)
 
           pkg = nil
@@ -208,9 +207,7 @@ module RPM
         end
       else
         box = nil
-        callback = -> (hdr : LibRPM::Header, type : LibRPM::CallbackType,
-                       amount : LibRPM::Loff, total : LibRPM::Loff,
-                       key : LibRPM::FnpyKey, data : LibRPM::CallbackData) do
+        callback = ->(hdr : LibRPM::Header, type : LibRPM::CallbackType, amount : LibRPM::Loff, total : LibRPM::Loff, key : LibRPM::FnpyKey, data : LibRPM::CallbackData) do
           LibRPM.rpmShowProgress(hdr, type, amount, total, key, data)
         end
       end

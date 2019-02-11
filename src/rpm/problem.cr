@@ -1,4 +1,3 @@
-
 module RPM
   class Problem
     property ptr : LibRPM::Problem
