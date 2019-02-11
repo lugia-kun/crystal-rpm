@@ -26,6 +26,20 @@ TODO: Write usage instructions here
 
 TODO: Write development instructions here
 
+[fakechroot] (recommended) or root permission (i.e., `sudo`) is
+required to run `crystal spec`, since this spec uses `chroot()`.
+
+Alternatively, using Docker is another method to test:
+
+```
+$ shards install
+$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
+$ docker run -v $(pwd):/work -w /work [version] crystal spec
+```
+
+Note that shards should be installed on local (because git in CentOS 6
+is too old and does not work with shards).
+
 ## Contributing
 
 1. Fork it (<https://github.com/lugia-kun/crystal-rpm/fork>)
@@ -41,3 +55,4 @@ TODO: Write development instructions here
 [RPM]: http://rpm.org/
 [Crystal]: https://crystal-lang.org/
 [ruby-rpm-ffi]: https://github.com/dmacvicar/ruby-rpm-ffi
+[fakechroot]: https://github.com/dex4er/fakechroot/wiki
