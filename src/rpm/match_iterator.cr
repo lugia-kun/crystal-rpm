@@ -1,6 +1,6 @@
 module RPM
   class MatchIterator
-    include Enumerable(MatchIterator)
+    include Enumerable(RPM::Package)
 
     def initialize(@ptr : LibRPM::DatabaseMatchIterator)
     end
