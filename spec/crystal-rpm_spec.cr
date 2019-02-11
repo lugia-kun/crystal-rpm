@@ -224,19 +224,17 @@ describe RPM::Transaction do
     describe "Test install" do
       path = fixture("simple-1.0-0.i586.rpm")
       pkg = RPM::Package.open(path)
-      RPM.transaction(tmproot) do |ts|
-        begin
-          ts.install(pkg, path)
-          ts.commit
-        ensure
-          ts.db.close
+      it "#install-ed \"#{pkg[RPM::Tag::Name]}\"" do
+        RPM.transaction(tmproot) do |ts|
+          begin
+            ts.install(pkg, path)
+            ts.commit
+          ensure
+            ts.db.close
+          end
         end
-      end
-      describe "#install-ed \"#{pkg[RPM::Tag::Name]}\"" do
         test_path = File.join(tmproot, "usr/share/simple/README")
-        it "#{test_path} exists?" do
-          File.exists?(test_path).should be_true
-        end
+        File.exists?(test_path).should be_true
       end
     end
 
@@ -295,45 +293,33 @@ describe RPM::Transaction do
     end
 
     describe "Test remove" do
-      # path = fixture("simple-1.0-0.i586.rpm")
-      # pkg = RPM::Package.open(path)
-      # RPM.transaction(tmproot) do |ts|
-      #   begin
-      #     ts.install(pkg, path)
-      #     ts.commit
-      #   ensure
-      #     ts.db.close
-      #   end
-      # end
+      it "#remove-ed properly" do
+        RPM.transaction(tmproot) do |ts|
+          iter = ts.init_iterator
+          iter.regexp(RPM::DbiTag::Name, RPM::MireMode::DEFAULT, "simple")
+          unless iter.find_all { |pkg|
+                   if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+                      pkg[RPM::Tag::Release].as(String) == "0" &&
+                      pkg[RPM::Tag::Arch].as(String) == "i586"
+                     ts.delete(pkg)
+                     true
+                   end
+                   false
+                 }
+            raise Exception.new("No packages found to remove!")
+          end
 
-      RPM.transaction(tmproot) do |ts|
-        iter = ts.init_iterator
-        iter.regexp(RPM::DbiTag::Name, RPM::MireMode::DEFAULT, "simple")
-        n = false
-        iter.each do |pkg|
-          if pkg[RPM::Tag::Version].as(String) == "1.0" &&
-             pkg[RPM::Tag::Release].as(String) == "0" &&
-             pkg[RPM::Tag::Arch].as(String) == "i586"
-            ts.delete(pkg)
-            n = true
+          begin
+            ts.order
+            ts.clean
+
+            ts.commit
+          ensure
+            ts.db.close
           end
         end
-        raise Exception.new("No packages found to remove!") unless n
-
-        begin
-          ts.order
-          ts.clean
-
-          ts.commit
-        ensure
-          ts.db.close
-        end
-      end
-      describe "#remove-ed properly" do
         test_path = File.join(tmproot, "usr/share/simple/README")
-        it "#{test_path} exists?" do
-          File.exists?(test_path).should be_false
-        end
+        File.exists?(test_path).should be_false
       end
     end
   end
