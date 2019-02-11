@@ -1,17 +1,6 @@
-FROM centos:6 AS libevent-2-build
-RUN yum install -y gcc
-WORKDIR /libevent-build
-RUN curl -LO https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz
-RUN tar xf libevent-2.0.22-stable.tar.gz
-WORKDIR /libevent-build/libevent-2.0.22-stable
-RUN ./configure --prefix=/opt/libevent2
-RUN make install
-
 FROM centos:6 AS rpm-4.8.0
 RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
 RUN yum install -y rpm-devel crystal
-RUN rpm -e --nodeps libevent libevent-devel
-COPY --from=libevent-2-build /opt/libevent2 /opt/libevent2
-RUN cp -R /opt/libevent2/lib/* /usr/lib64
-RUN /sbin/ldconfig
+RUN rpm -e --nodeps libevent libevent-devel libevent-headers libevent-doc
+RUN yum install -y libevent2 libevent2-devel
 WORKDIR /work
