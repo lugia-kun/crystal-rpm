@@ -11,7 +11,8 @@ env:
   # - BASE_IAMGE=fedora:23 # rpm 4.13.0-rc1
   # - BASE_IMAGE=fedora:24 # rpm 4.13.0-rc1
   # - BASE_IMAGE=fedora:25 # rpm 4.13.0.1
-  # - BASE_IMAGE=fedora:26 # rpm 4.13.0.2
+  # - BASE_IMAGE=fedora:26 # rpm 4.13.0.1
+  # - BASE_IMAGE=fedora:26 + updates # 4.13.1
   # - BASE_IMAGE=fedora:27 # rpm 4.14.1
   # - BASE_IMAGE=fedora:28 # rpm 4.14.2.1
   # - BASE_IMAGE=fedora:29 # rpm 4.14.2.1
@@ -20,6 +21,7 @@ env:
   - RPMVERSION=rpm-4.11.3
   - RPMVERSION=rpm-4.12.0.1
   - RPMVERSION=rpm-4.13.0.1
+  - RPMVERSION=rpm-4.13.1
   - RPMVERSION=rpm-4.14.2.1
   - RPMVERSION=opensuse # OpenSUSE's rpm behave differently...
 
