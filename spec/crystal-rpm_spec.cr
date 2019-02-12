@@ -207,7 +207,11 @@ describe RPM::Problem do
     end
 
     it "has string #str" do
-      problem.str.should eq("Hello")
+      {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+        problem.str.should eq("foo-1.0-0")
+      {% else %}
+        problem.str.should eq("Hello")
+      {% end %}
     end
 
     it "descriptive #to_s" do
