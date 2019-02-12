@@ -13,6 +13,12 @@ module RPM
     def initialize(@ptr)
     end
 
+    def initialize(type, pkg_nevr, key, alt_nevr, str, number)
+      ptr = RPM.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+      raise Exception.new("Cannot create RPM problem") if ptr.null?
+      @ptr = ptr
+    end
+
     def type
       LibRPM.rpmProblemGetType(@ptr)
     end
@@ -31,7 +37,13 @@ module RPM
     end
 
     def to_s
-      str
+      ptr = LibRPM.rpmProblemString(@ptr)
+      return "#<RPM::Problem (empty problem)>" if ptr.null?
+      begin
+        String.new(ptr)
+      ensure
+        LibC.free(ptr)
+      end
     end
 
     def <=>(other)

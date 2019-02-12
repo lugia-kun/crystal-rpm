@@ -11,7 +11,22 @@ module RPM
       raise Exception.new("cannot open rpmdb") if r != 0
     end
 
-    def init_iterator
+    def init_iterator(tag : DbiTag | DbiTagValue, val : String? | Slice(UInt8) = nil)
+      if RPM.least_rpm49?
+        @ts.init_iterator(tag, val)
+      else
+        db = LibRPM.rpmtsGetRdb(@ts.ptr)
+        if val
+          it_ptr = LibRPM.rpmdbInitIterator(db, tag, val, val.size)
+        else
+          it_ptr = LibRPM.rpmdbInitIterator(db, tag, nil, 0)
+        end
+        if it_ptr.null?
+          raise Exception.new("Can't init iterator for [#{tag}] -> '#{val}'")
+        end
+
+        MatchIterator.new(it_ptr)
+      end
     end
 
     def finalize

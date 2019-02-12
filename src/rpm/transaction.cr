@@ -45,11 +45,11 @@ module RPM
     end
 
     def each_match(key, val)
-      init_iterator(key, val)
+      self.db.init_iterator(key, val)
     end
 
     def each_match(key, val, &block)
-      itr = init_iterator(key, val)
+      itr = self.db.init_iterator(key, val)
       itr.each(&block)
     end
 
@@ -227,11 +227,12 @@ module RPM
       self.flags = TransactionFlags::NONE
       set_notify_callback(callback) do
         rc = LibRPM.rpmtsRun(@ptr, nil, LibRPM::ProbFilterFlags::NONE)
-        if rc < 0
+        if rc == 0
+          @keys.clear
+        elsif rc < 0
           msg = String.new(LibRPM.rpmlogMessage)
           raise Exception.new("#{self}: #{msg}")
-        end
-        if rc > 0
+        elsif rc > 0
           ps = LibRPM.rpmtsProblems(@ptr)
           psi = LibRPM.rpmpsInitIterator(ps)
           while LibRPM.rpmpsNextIterator(psi) >= 0

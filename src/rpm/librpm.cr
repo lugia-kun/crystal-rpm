@@ -1,4 +1,39 @@
 module RPM
+  macro define_version(const, version)
+    {{const}} = {{version}}
+  end
+
+  macro define_version_constants(version)
+    # The version of librpm which is used at compiled time.
+    PKGVERSION = {{version}}
+
+    {% splitted = version.split(".") %}
+
+    # Major version part of PKGVERSION
+    PKGVERSION_MAJOR = {{splitted[0].id}}
+
+    # Minor version part of PKGVERSION
+    PKGVERSION_MINOR = {{splitted[1].id}}
+
+    # Patch version part of PKGVERSION
+    PKGVERSION_PATCH = {{splitted[2].id}}
+
+    {% if splitted.size >= 3 %}
+      PKGVERSION_EXTRA = {{splitted[3..-1].join(".")}}
+    {% else %}
+      PKGVERSION_EXTRA = nil
+    {% end %}
+  end
+
+  define_version_constants({{`pkg-config rpm --modversion`.chomp.stringify}})
+
+  macro define_3_parts_version(maj, min, pat)
+    # Comparable version of `PKGVERSION` by `compare_versions()`.
+    define_version(PKGVERSION_COMP, {{[maj, min, pat].join(".")}})
+  end
+
+  define_3_parts_version({{PKGVERSION_MAJOR}}, {{PKGVERSION_MINOR}}, {{PKGVERSION_PATCH}})
+
   @[Link(ldflags: "`pkg-config rpm --libs`")]
   lib LibRPM
     # ## Internal types
@@ -69,6 +104,7 @@ module RPM
     alias CallbackFunction = (LibRPM::Header, CallbackType, Loff, Loff, FnpyKey, CallbackData) -> Pointer(Void)
 
     # ## CLI APIs.
+    $rpmcliPackagesTotal : Int
     fun rpmShowProgress(LibRPM::Header, CallbackType, Loff, Loff, FnpyKey, Void*) : Pointer(Void)
 
     # ## DB APIs.
@@ -85,7 +121,7 @@ module RPM
     fun rpmdbGetIteratorCount(RPMDbMatchIterator) : Int
     fun rpmdbSetIteratorRE(RPMDbMatchIterator, TagVal, MireMode, UInt8*) : Int
 
-    fun rpmdbInitIterator(RPMDbMatchIterator, DbiTagVal, Void*, SizeT) : RPMDbMatchIterator
+    fun rpmdbInitIterator(RPMDb, DbiTagVal, Void*, SizeT) : RPMDbMatchIterator
 
     fun rpmdbNextIterator(RPMDbMatchIterator) : Header
     fun rpmdbFreeIterator(RPMDbMatchIterator) : Void
@@ -671,7 +707,12 @@ module RPM
       OBSOLETES
     end
 
-    fun rpmProblemCreate(ProblemType, UInt8*, FnpyKey, UInt8*, UInt8*, UInt64) : Problem
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+      fun rpmProblemCreate(ProblemType, UInt8*, FnpyKey, UInt8*, UInt8*, UInt8*, UInt64) : Problem
+    {% else %}
+      fun rpmProblemCreate(ProblemType, UInt8*, FnpyKey, UInt8*, UInt8*, UInt64) : Problem
+    {% end %}
+
     fun rpmProblemFree(Problem) : Problem
     fun rpmProblemLink(Problem) : Problem
     fun rpmProblemGetType(Problem) : ProblemType
@@ -824,60 +865,67 @@ module RPM
   alias Sense = LibRPM::Sense
   alias TransactionFlags = LibRPM::TransFlags
   alias MireMode = LibRPM::MireMode
+  alias ProblemType = LibRPM::ProblemType
 
-  macro _version_depends(version)
-    # The version of librpm which is linked against
-    PKGVERSION = {{version}}
+  # Reduce version differences...
+  {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+    def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, "", str, alt_nevr, number)
+    end
 
-    {% a = version.split(".") %}
-    {% version_code = ((a[0].to_i << 16) + (a[1].to_i << 8) + (a[2].to_i)) %}
+    def self.problem_create(type, pkg_nevr, key, alt_nevr, dir, file, number)
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
+    end
+  {% else %}
+    def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
+    end
 
-    # Numerical representation of `PKGVERSION`
-    PKGVERSION_CODE = {{ version_code }}
+    def self.problem_create(type, pkg_nevr, key, alt_nevr, dir, file, number)
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr,
+                              File.join(dir, file), number)
+    end
+  {% end %}
 
-    {% if compare_versions(version, "4.9.0") >= 0 %}
-      # Return Tag Type for a Tag
-      def self.tag_type(v) : TagType
-        LibRPM.rpmTagType(v)
-      end
+  {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
+    # Return Tag Type for a Tag
+    def self.tag_type(v) : TagType
+      LibRPM.rpmTagType(v)
+    end
 
-      # Return Tag Return Type for a tag
-      def self.tag_get_return_type(v) : TagReturnType
-        LibRPM.rpmTagGetReturnType(v)
-      end
-    {% else %}
-      # Return Tag Type for a Tag
-      def self.tag_type(v) : TagType
-        m = LibRPM.rpmTagGetType(v)
-        TagType.new((m & ~TagReturnType::MASK.value).to_i32)
-      end
+    # Return Tag Return Type for a tag
+    def self.tag_get_return_type(v) : TagReturnType
+      LibRPM.rpmTagGetReturnType(v)
+    end
+  {% else %}
+    # Return Tag Type for a Tag
+    def self.tag_type(v) : TagType
+      m = LibRPM.rpmTagGetType(v)
+      TagType.new((m & ~TagReturnType::MASK.value).to_i32)
+    end
 
-      # Return Tag Return Type for a tag
-      def self.tag_get_return_type(v) : TagReturnType
-        m = LibRPM.rpmTagGetType(v)
-        TagReturnType.new(m & TagReturnType::MASK.value)
-      end
-    {% end %}
+    # Return Tag Return Type for a tag
+    def self.tag_get_return_type(v) : TagReturnType
+      m = LibRPM.rpmTagGetType(v)
+      TagReturnType.new(m & TagReturnType::MASK.value)
+    end
+  {% end %}
 
-    {% if compare_versions(version, "4.14.0") >= 0 %}
-      def push_macro(mc, n, o, b, level) : Int
-        LibRPM.rpmPushMacro(mc, n, o, b, level)
-      end
+  {% if compare_versions(PKGVERSION_COMP, "4.14.0") >= 0 %}
+    def self.push_macro(mc, n, o, b, level) : Int
+      LibRPM.rpmPushMacro(mc, n, o, b, level)
+    end
 
-      def pop_macro(mc, n) : Int
-        LibRPM.rpmPopMacro(mc, n)
-      end
-    {% else %}
-      def push_macro(mc, n, o, b, level) : Int
-        LibRPM.addMacro(mc, n, o, b, level)
-      end
+    def self.pop_macro(mc, n) : Int
+      LibRPM.rpmPopMacro(mc, n)
+    end
+  {% else %}
+    def self.push_macro(mc, n, o, b, level) : Int
+      LibRPM.addMacro(mc, n, o, b, level)
+    end
 
-      def pop_macro(mc, n) : Int
-        LibRPM.delMacro(mc, n)
-      end
-    {% end %}
-  end
-
-  # `pkg-config rpm --modversion` can be 4-parted version, like "4.14.0.2"
-  _version_depends({{`pkg-config rpm --modversion`.split(".")[0..2].join(".").chomp}})
+    def self.pop_macro(mc, n) : Int
+      LibRPM.delMacro(mc, n)
+    end
+  {% end %}
 end

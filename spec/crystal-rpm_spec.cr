@@ -5,11 +5,11 @@ describe RPM do
   puts "Using RPM version #{RPM::PKGVERSION}"
 
   it "has a VERSION matches obtained from pkg-config" do
-    RPM::RPMVERSION.should start_with(RPM::PKGVERSION)
+    RPM::RPMVERSION.should eq(RPM::PKGVERSION)
   end
 
-  it "has a version code" do
-    RPM.rpm_version_code.should eq(RPM::PKGVERSION_CODE)
+  it "has a VERSION matches comparable version" do
+    RPM::RPMVERSION.should start_with(RPM::PKGVERSION_COMP)
   end
 end
 
@@ -195,6 +195,27 @@ describe RPM::Package do
   end
 end
 
+describe RPM::Problem do
+  describe ".create-ed problem" do
+    problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
+    it "has #key" do
+      String.new(problem.key.as(Pointer(UInt8))).should eq("foo.rpm")
+    end
+
+    it "has #type" do
+      problem.type.should eq(RPM::ProblemType::REQUIRES)
+    end
+
+    it "has string #str" do
+      problem.str.should eq("Hello")
+    end
+
+    it "descriptive #to_s" do
+      problem.to_s.should eq("Hello is needed by (installed) bar-1.0-0")
+    end
+  end
+end
+
 describe RPM::Transaction do
   describe "#root_dir" do
     RPM.transaction do |ts|
@@ -293,7 +314,7 @@ describe RPM::Transaction do
     end
 
     describe "Test remove" do
-      # TODO: RPM in OpenSUSE works this semantic, but not in
+      # TODO: RPM in OpenSUSE works with this semantic, but not in
       # others. This must be investigated...
       pending "#remove-ed properly" do
         RPM.transaction(tmproot) do |ts|
