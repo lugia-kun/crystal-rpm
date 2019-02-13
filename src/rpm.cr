@@ -4,7 +4,8 @@ module RPM
   # Version of crystal binding
   VERSION = "0.1.0"
 
-  # Runtime Version of RPM Library (RPM::PKGVERSION is compile-time version)
+  # Runtime Version of RPM Library (cf. `RPM::PKGVERSION` is
+  # compile-time version)
   RPMVERSION = String.new(LibRPM.rpmversion)
 
   # Calculate version code.

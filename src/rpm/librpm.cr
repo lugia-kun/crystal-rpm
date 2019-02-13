@@ -1,24 +1,31 @@
 module RPM
+  # :nodoc:
   macro define_version(const, version)
     {{const}} = {{version}}
   end
 
+  # :nodoc:
   macro define_version_constants(version)
     # The version of librpm which is used at compiled time.
     PKGVERSION = {{version}}
 
     {% splitted = version.split(".") %}
 
-    # Major version part of PKGVERSION
+    # Major version part of `PKGVERSION`
     PKGVERSION_MAJOR = {{splitted[0].id}}
 
-    # Minor version part of PKGVERSION
+    # Minor version part of `PKGVERSION`
     PKGVERSION_MINOR = {{splitted[1].id}}
 
-    # Patch version part of PKGVERSION
+    # Patch version part of `PKGVERSION`
     PKGVERSION_PATCH = {{splitted[2].id}}
 
-    {% if splitted.size >= 3 %}
+    # If `PKGVERSION` has 4 or more parts, `PKGVERSION_EXTRA` contains it.
+    # For example, if the version is `4.14.2.1`, `PKGVERSION_EXTRA` will be
+    # set to `"1"` (note that string).
+    #
+    # `PKGVERSION_EXTRA` will be `nil` if no such parts.
+    {% if splitted.size >= 4 %}
       PKGVERSION_EXTRA = {{splitted[3..-1].join(".")}}
     {% else %}
       PKGVERSION_EXTRA = nil
@@ -27,6 +34,7 @@ module RPM
 
   define_version_constants({{`pkg-config rpm --modversion`.chomp.stringify}})
 
+  # :nodoc:
   macro define_3_parts_version(maj, min, pat)
     # Comparable version of `PKGVERSION` by `compare_versions()`.
     define_version(PKGVERSION_COMP, {{[maj, min, pat].join(".")}})
@@ -872,7 +880,7 @@ module RPM
     #
     # RPM 4.9~
     #
-    # ------------------------------------------------------------------------
+    # ========================================================================
     # type          pkg_nevr      alt_nevr        str            number
     # ------------- ------------- --------------- -------------- -------------
     # BADARCH       target pkg    (unused)        arch name      (unused)
@@ -888,7 +896,7 @@ module RPM
     # CONFLICT      (unused)      conflict pkg    name conflicts 1 = installed
     # OBSOLETES     (unused)      obsoletes pkg   name obsoleted 1 = installed
     # VERIFY        target pkg    (unused)        content        (unused)
-    # ------------------------------------------------------------------------
+    # ========================================================================
     #
     # ~RPM4.8
     #
@@ -896,7 +904,7 @@ module RPM
     #  separatedly, but it simply joins them, so set dirname to `nil` is
     #  suffice.)
     #
-    # ------------------------------------------------------------------------
+    # ========================================================================
     # type          pkg_nevr      alt_nevr        str            number
     # ------------- ------------- --------------- -------------- -------------
     # BADARCH       target pkg    (unused)        arch name      (unused)
@@ -912,7 +920,7 @@ module RPM
     # CONFLICTS     conflict pkg  pkg conflicted+2 (unused)      0 = installed
     # (OBSOLETES)   obsoletes pkg pkg obsoleted+2  (unused)      0 = installed
     # (VERIFY)
-    # -------------------------------------------------------------------------
+    # ========================================================================
     #
     # OBSOLETES is not defined in RPM 4.8, but applies same translation to
     # REQUIRES or CONFLICTS.
@@ -920,7 +928,7 @@ module RPM
     # No translation applies for VERIFY.
     #
 
-    # Translate RPM 4.9.0 or later semantics into RPM 4.8.0 Problem
+    # Create a problem with RPM 4.9.0 calling convention
     def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
@@ -930,17 +938,17 @@ module RPM
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, nil, str, alt_nevr, number)
     end
 
-    # Sets RPM 4.8.x or prior semantics
+    # Create a problem with RPM 4.8.x calling convention
     def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
     end
   {% else %}
-    # Sets RPM 4.9.0 or later semantics
+    # Create a problem with RPM 4.9.0 calling convention
     def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
     end
 
-    # Translate RPM 4.8.x or prior semantics into RPM 4.9.0 Problem
+    # Create a problem with RPM 4.8.x calling convention
     def self.problem_create(type, pkg_nevr, key, alt_nevr, dir, file, number)
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
