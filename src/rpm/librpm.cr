@@ -933,7 +933,7 @@ module RPM
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
         pkg_nevr, str, alt_nevr = alt_nevr, pkg_nevr, "  " + str
-        number = (!number).to_unsafe
+        number = (number == 0) ? 1 : 0
       end
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, nil, str, alt_nevr, number)
     end
@@ -949,14 +949,16 @@ module RPM
     end
 
     # Create a problem with RPM 4.8.x calling convention
-    def self.problem_create(type, pkg_nevr, key, alt_nevr, dir, file, number)
+    def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
+      str = dir || file || ""
+      str += file if file
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
-        alt_nevr, pkg_nevr, str = pkg_nevr, str, alt_nevr.slice(2..-1)
-        number = (!number).to_unsafe
+        str, alt_nevr, pkg_nevr = alt_nevr[2..-1], pkg_nevr, str
+        number = (number != 0) ? 0 : 1
       end
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr,
-                              dir + file, number)
+                              str, number)
     end
   {% end %}
 
