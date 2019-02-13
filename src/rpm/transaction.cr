@@ -236,7 +236,7 @@ module RPM
           ps = LibRPM.rpmtsProblems(@ptr)
           psi = LibRPM.rpmpsInitIterator(ps)
           while LibRPM.rpmpsNextIterator(psi) >= 0
-            problem = Problem.from_ptr(LibRPM.rpmpsGetProblem(psi))
+            problem = Problem.new(LibRPM.rpmpsGetProblem(psi))
             STDERR.puts problem.str
           end
           LibRPM.rpmpsFreeIterator(psi)

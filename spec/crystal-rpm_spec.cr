@@ -196,7 +196,7 @@ describe RPM::Package do
 end
 
 describe RPM::Problem do
-  describe ".create-ed problem" do
+  describe ".create-ed problem (RPM 4.9 style)" do
     problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
     it "has #key" do
       String.new(problem.key.as(Pointer(UInt8))).should eq("foo.rpm")
@@ -216,6 +216,44 @@ describe RPM::Problem do
 
     it "descriptive #to_s" do
       problem.to_s.should eq("Hello is needed by (installed) bar-1.0-0")
+    end
+  end
+
+  problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+  describe ".create-ed problem (RPM 4.8 style)" do
+    it "has #type" do
+      problem.type.should eq(RPM::ProblemType::REQUIRES)
+    end
+
+    it "has string #str" do
+      {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+        problem.str.should eq("")
+      {% else %}
+        problem.str.should eq("Hello")
+      {% end %}
+    end
+
+    it "descriptive #to_s" do
+      problem.to_s.should eq("Hello is needed by (installed) bar-1.0-0")
+    end
+  end
+
+  problem2 = RPM::Problem.new(problem.ptr)
+  describe ".new from Existing pointer" do
+    it "has same key" do
+      problem2.key.should eq(problem.key)
+    end
+
+    it "has same type" do
+      problem2.type.should eq(problem.type)
+    end
+
+    it "has same str" do
+      problem2.str.should eq(problem.str)
+    end
+
+    it "has same description" do
+      problem2.to_s.should eq(problem.to_s)
     end
   end
 end

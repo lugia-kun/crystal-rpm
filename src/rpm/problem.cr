@@ -6,15 +6,17 @@ module RPM
       LibRPM.rpmProblemFree(@ptr)
     end
 
-    def self.from_ptr(ptr)
-      new(ptr)
-    end
-
     def initialize(@ptr)
     end
 
     def initialize(type, pkg_nevr, key, alt_nevr, str, number)
       ptr = RPM.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+      raise Exception.new("Cannot create RPM problem") if ptr.null?
+      @ptr = ptr
+    end
+
+    def initialize(type, pkg_nevr, key, dir, file, alt_nevr, number)
+      ptr = RPM.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
       raise Exception.new("Cannot create RPM problem") if ptr.null?
       @ptr = ptr
     end
