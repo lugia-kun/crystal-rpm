@@ -28,4 +28,38 @@ module RPM
 
   # Default macro files
   MACROFILES = String.new(LibRPM.macrofiles)
+
+  # Read macro
+  def self.[](name : String)
+    input = "%{#{name}}"
+    expnd = LibRPM.rpmExpand(input, nil)
+    if expnd.null?
+      raise IndexError.new("RPM Macro #{name} not defined or error")
+    else
+      str = String.new(expnd)
+      if str == input
+        raise IndexError.new("RPM Macro #{name} not defined or error")
+      end
+      str
+    end
+  ensure
+    LibC.free(expnd) if expnd && !expnd.null?
+  end
+
+  def self.[]?(name : String)
+    input = "%{#{name}}"
+    expnd = LibRPM.rpmExpand(input, nil)
+    if expnd.null? || expnd == input
+      nil
+    else
+      str = String.new(expnd)
+      if str == input
+        nil
+      else
+        str
+      end
+    end
+  ensure
+    LibC.free(expnd) if expnd && !expnd.null?
+  end
 end

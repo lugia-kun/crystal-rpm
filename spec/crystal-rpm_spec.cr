@@ -258,6 +258,28 @@ describe RPM::Problem do
   end
 end
 
+describe RPM do
+  describe ".[]" do
+    it "can obtain macro value" do
+      RPM["_usr"].should eq("/usr")
+    end
+    it "raises Exception if not found" do
+      expect_raises(IndexError) do
+        puts RPM["not-defined"]
+      end
+    end
+  end
+
+  describe ".[]?" do
+    it "can obtain macro value" do
+      RPM["_usr"]?.should eq("/usr")
+    end
+    it "nil if not found" do
+      RPM["not-defined"]?.should be_nil
+    end
+  end
+end
+
 describe RPM::Transaction do
   describe "#root_dir" do
     RPM.transaction do |ts|

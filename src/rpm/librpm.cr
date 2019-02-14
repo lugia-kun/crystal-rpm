@@ -684,6 +684,8 @@ module RPM
     fun addMacro(MacroContext, UInt8*, UInt8*, UInt8*, Int) : Int
     fun delMacro(MacroContext, UInt8*) : Int
 
+    fun rpmExpand(UInt8*, ...) : Pointer(UInt8)
+
     # ## Problem APIs.
 
     @[Flags]
