@@ -875,81 +875,25 @@ module RPM
   alias MireMode = LibRPM::MireMode
   alias ProblemType = LibRPM::ProblemType
 
-  # Reduce version differences...
-  {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-    #
-    # RPM 4.9~
-    #
-    # ========================================================================
-    # type          pkg_nevr      alt_nevr        str            number
-    # ------------- ------------- --------------- -------------- -------------
-    # BADARCH       target pkg    (unused)        arch name      (unused)
-    # BADOS         target pkg    (unused)        os name        (unused)
-    # PKG_INSTALLED target pkg    (unused)        (unused)       (unused)
-    # BADRELOCATE   target pkg    (unused)        relocated path (unused)
-    # NF_CONFLICT   target pkg    conflicting pkg file path      (unused)
-    # FILE_CONFLICT installed pkg conflicting pkg file path      (unused)
-    # OLD_PACKAGE   target pkg    installed pkg   (unused)       (unused)
-    # DISKSPACE     target pkg    (unused)        file system    number bytes
-    # DISKNODES     target pkg    (unused)        file system    number inodes
-    # REQUIRES      (unused)      required pkg    name requires  1 = installed
-    # CONFLICT      (unused)      conflict pkg    name conflicts 1 = installed
-    # OBSOLETES     (unused)      obsoletes pkg   name obsoleted 1 = installed
-    # VERIFY        target pkg    (unused)        content        (unused)
-    # ========================================================================
-    #
-    # ~RPM4.8
-    #
-    # (note: the function arguments requires dirname and filename
-    #  separatedly, but it simply joins them, so set dirname to `nil` is
-    #  suffice.)
-    #
-    # ========================================================================
-    # type          pkg_nevr      alt_nevr        str            number
-    # ------------- ------------- --------------- -------------- -------------
-    # BADARCH       target pkg    (unused)        arch name      (unused)
-    # BADOS         target pkg    (unused)        os name        (unused)
-    # PKG_INSTALLED target pkg    (unused)        (unused)       (unused)
-    # BADRELOCATE   target pkg    (unused)        relocated path (unused)
-    # NF_CONFLICT   target pkg    conflicting pkg file path      (unused)
-    # FILE_CONFLICT installed pkg conflicting pkg file path      (unused)
-    # OLD_PACKAGE   target pkg    installed pkg   (unused)       (unused)
-    # DISKSPACE     target pkg    (unused)        file system    number bytes
-    # DISKNODES     target pkg    (unused)        file system    number inodes
-    # REQUIRES      required pkg  pkg requires+2  (unused)       0 = installed
-    # CONFLICTS     conflict pkg  pkg conflicted+2 (unused)      0 = installed
-    # (OBSOLETES)   obsoletes pkg pkg obsoleted+2  (unused)      0 = installed
-    # (VERIFY)
-    # ========================================================================
-    #
-    # OBSOLETES is not defined in RPM 4.8, but applies same translation to
-    # REQUIRES or CONFLICTS.
-    #
-    # No translation applies for VERIFY.
-    #
-
-    # Create a problem with RPM 4.9.0 calling convention
-    def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+  # Create a problem with RPM 4.9 or later calling convention
+  def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
         pkg_nevr, str, alt_nevr = alt_nevr, pkg_nevr, "  " + str
         number = (number == 0) ? 1 : 0
       end
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, nil, str, alt_nevr, number)
-    end
-
-    # Create a problem with RPM 4.8.x calling convention
-    def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
-    end
-  {% else %}
-    # Create a problem with RPM 4.9.0 calling convention
-    def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
+    {% else %}
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
-    end
+    {% end %}
+  end
 
-    # Create a problem with RPM 4.8.x calling convention
-    def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
+  # Create a problem with RPM 4.8.x calling convention
+  def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
+    {% else %}
       str = dir || file || ""
       str += file if file
       case type
@@ -957,50 +901,57 @@ module RPM
         str, alt_nevr, pkg_nevr = alt_nevr[2..-1], pkg_nevr, str
         number = (number != 0) ? 0 : 1
       end
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr,
-                              str, number)
-    end
-  {% end %}
+      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
+    {% end %}
+  end
 
-  {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
-    # Return Tag Type for a Tag
-    def self.tag_type(v) : TagType
+  # Return Tag Type for a Tag
+  #
+  # * Calls `rpmTagGetType()` for RPM 4.9 or later,
+  # * Calls `rpmTagGetType()` and mask for RPM 4.8
+  def self.tag_type(v) : TagType
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
       LibRPM.rpmTagType(v)
-    end
-
-    # Return Tag Return Type for a tag
-    def self.tag_get_return_type(v) : TagReturnType
-      LibRPM.rpmTagGetReturnType(v)
-    end
-  {% else %}
-    # Return Tag Type for a Tag
-    def self.tag_type(v) : TagType
+    {% else %}
       m = LibRPM.rpmTagGetType(v)
       TagType.new((m & ~TagReturnType::MASK.value).to_i32)
-    end
+    {% end %}
+  end
 
-    # Return Tag Return Type for a tag
-    def self.tag_get_return_type(v) : TagReturnType
+  # Return Tag Return Type for a tag
+  #
+  # * Calls `rpmTagGetReturnType()` for RPM 4.9 or later,
+  # * Calls `rpmTagGetType()` and mask for RPM 4.8
+  def self.tag_get_return_type(v) : TagReturnType
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
+      LibRPM.rpmTagGetReturnType(v)
+    {% else %}
       m = LibRPM.rpmTagGetType(v)
       TagReturnType.new(m & TagReturnType::MASK.value)
-    end
-  {% end %}
+    {% end %}
+  end
 
-  {% if compare_versions(PKGVERSION_COMP, "4.14.0") >= 0 %}
-    def self.push_macro(mc, n, o, b, level) : Int
+  # Add macro definitiion
+  #
+  # * Calls `rpmPushMacro()` for RPM 4.14 or later,
+  # * Calls `addMacro()` for otherwise
+  def self.push_macro(mc, n, o, b, level) : Int
+    {% if compare_versions(PKGVERSION_COMP, "4.14.0") >= 0 %}
       LibRPM.rpmPushMacro(mc, n, o, b, level)
-    end
-
-    def self.pop_macro(mc, n) : Int
-      LibRPM.rpmPopMacro(mc, n)
-    end
-  {% else %}
-    def self.push_macro(mc, n, o, b, level) : Int
+    {% else %}
       LibRPM.addMacro(mc, n, o, b, level)
-    end
+    {% end %}
+  end
 
-    def self.pop_macro(mc, n) : Int
+  # Remove macro definition
+  #
+  # * Calls `rpmPopMacro()` for RPM 4.14 or later,
+  # * Calls `delMacro()` for otherwise
+  def self.pop_macro(mc, n) : Int
+    {% if compare_versions(PKGVERSION_COMP, "4.14.0") >= 0 %}
+      LibRPM.rpmPopMacro(mc, n)
+    {% else %}
       LibRPM.delMacro(mc, n)
-    end
-  {% end %}
+    {% end %}
+  end
 end
