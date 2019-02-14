@@ -896,7 +896,7 @@ module RPM
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
       LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
     {% else %}
-      str = dir || file || ""
+      str = dir || ""
       str += file if file
       case type
       when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
