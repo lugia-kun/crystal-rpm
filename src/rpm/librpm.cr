@@ -676,15 +676,21 @@ module RPM
 
     # Use RPM#push_macro and RPM#pop_macro
 
-    # These two functions are added at 4.14.0
-    fun rpmPushMacro(MacroContext, UInt8*, UInt8*, UInt8*, Int) : Int
-    fun rpmPopMacro(MacroContext, UInt8*) : Int
-
-    # These two functions are removed at 4.14.0
-    fun addMacro(MacroContext, UInt8*, UInt8*, UInt8*, Int) : Int
-    fun delMacro(MacroContext, UInt8*) : Int
+    {% if compare_versions(PKGVERSION_COMP, "4.14.0") < 0 %}
+      fun addMacro(MacroContext, UInt8*, UInt8*, UInt8*, Int) : Int
+      fun delMacro(MacroContext, UInt8*) : Int
+    {% else %}
+      fun rpmPushMacro(MacroContext, UInt8*, UInt8*, UInt8*, Int) : Int
+      fun rpmPopMacro(MacroContext, UInt8*) : Int
+    {% end %}
 
     fun rpmExpand(UInt8*, ...) : Pointer(UInt8)
+    {% if compare_versions(PKGVERSION_COMP, "4.14.0") < 0 %}
+      fun expandMacros(Void*, MacroContext, UInt8*, Int) : Int
+    {% end %}
+    {% if compare_versions(PKGVERSION_COMP, "4.13.0") >= 0 %}
+      fun rpmExpandMacros(MacroContext, UInt8*, UInt8**, Int) : Int
+    {% end %}
 
     # ## Problem APIs.
 

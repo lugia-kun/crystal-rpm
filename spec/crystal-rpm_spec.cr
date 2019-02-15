@@ -11,6 +11,38 @@ describe RPM do
   it "has a VERSION matches comparable version" do
     RPM::RPMVERSION.should start_with(RPM::PKGVERSION_COMP)
   end
+
+  describe ".[]" do
+    it "can obtain macro value" do
+      RPM["_usr"].should eq("/usr")
+    end
+    it "raises Exception if not found" do
+      expect_raises(KeyError) do
+        puts RPM["not-defined"]
+      end
+    end
+  end
+
+  describe ".[]?" do
+    it "can obtain macro value" do
+      RPM["_usr"]?.should eq("/usr")
+    end
+    it "nil if not found" do
+      RPM["not-defined"]?.should be_nil
+    end
+  end
+
+  describe ".[]=" do
+    it "can set macro" do
+      RPM["hoge"] = "hoge"
+      RPM["hoge"].should eq("hoge")
+    end
+    it "can remove macro" do
+      RPM["hoge"]?.should_not be_nil
+      RPM["hoge"] = nil
+      RPM["hoge"]?.should be_nil
+    end
+  end
 end
 
 describe "RPM::Lib" do
@@ -254,28 +286,6 @@ describe RPM::Problem do
 
     it "has same description" do
       problem2.to_s.should eq(problem.to_s)
-    end
-  end
-end
-
-describe RPM do
-  describe ".[]" do
-    it "can obtain macro value" do
-      RPM["_usr"].should eq("/usr")
-    end
-    it "raises Exception if not found" do
-      expect_raises(IndexError) do
-        puts RPM["not-defined"]
-      end
-    end
-  end
-
-  describe ".[]?" do
-    it "can obtain macro value" do
-      RPM["_usr"]?.should eq("/usr")
-    end
-    it "nil if not found" do
-      RPM["not-defined"]?.should be_nil
     end
   end
 end

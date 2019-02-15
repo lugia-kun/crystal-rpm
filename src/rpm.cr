@@ -29,16 +29,28 @@ module RPM
   # Default macro files
   MACROFILES = String.new(LibRPM.macrofiles)
 
+  # Write macro
+  def self.[]=(name : String, value : String?)
+    if value.nil?
+      RPM.pop_macro(nil, name)
+    else
+      RPM.push_macro(nil, name, "", value, LibRPM::RMIL_DEFAULT)
+    end
+    value
+  end
+
   # Read macro
+  #
+  # Raises KeyError when specified name is not defined
   def self.[](name : String)
     input = "%{#{name}}"
     expnd = LibRPM.rpmExpand(input, nil)
     if expnd.null?
-      raise IndexError.new("RPM Macro #{name} not defined or error")
+      raise KeyError.new("RPM Macro #{name} not defined or error")
     else
       str = String.new(expnd)
       if str == input
-        raise IndexError.new("RPM Macro #{name} not defined or error")
+        raise KeyError.new("RPM Macro #{name} not defined or error")
       end
       str
     end
@@ -46,10 +58,13 @@ module RPM
     LibC.free(expnd) if expnd && !expnd.null?
   end
 
+  # Read macro
+  #
+  # Return nil if specified name is not defined.
   def self.[]?(name : String)
     input = "%{#{name}}"
     expnd = LibRPM.rpmExpand(input, nil)
-    if expnd.null? || expnd == input
+    if expnd.null?
       nil
     else
       str = String.new(expnd)
