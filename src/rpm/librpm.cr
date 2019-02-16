@@ -9,27 +9,24 @@ module RPM
     # The version of librpm which is used at compiled time.
     PKGVERSION = {{version}}
 
-    {% splitted = version.split(".") %}
+    {% semver = version.split("-") %}
+    {% splitted = semver[0].split(".") %}
 
     # Major version part of `PKGVERSION`
-    PKGVERSION_MAJOR = {{splitted[0].id}}
+    PKGVERSION_MAJOR = {{splitted[0].to_i}}
 
     # Minor version part of `PKGVERSION`
-    PKGVERSION_MINOR = {{splitted[1].id}}
+    PKGVERSION_MINOR = {{splitted[1].to_i}}
 
     # Patch version part of `PKGVERSION`
-    PKGVERSION_PATCH = {{splitted[2].id}}
+    PKGVERSION_PATCH = {{splitted[2].to_i}}
 
-    # If `PKGVERSION` has 4 or more parts, `PKGVERSION_EXTRA` contains it.
+    # If `PKGVERSION` has 4 parts, `PKGVERSION_EXTRA` contains the fourth part.
     # For example, if the version is `4.14.2.1`, `PKGVERSION_EXTRA` will be
-    # set to `"1"` (note that string).
+    # set to `1` (note that string).
     #
-    # `PKGVERSION_EXTRA` will be `nil` if no such parts.
-    {% if splitted.size >= 4 %}
-      PKGVERSION_EXTRA = {{splitted[3..-1].join(".")}}
-    {% else %}
-      PKGVERSION_EXTRA = nil
-    {% end %}
+    # `PKGVERSION_EXTRA` will be 0 if fourth part does not exist.
+    PKGVERSION_EXTRA = {{splitted.size > 3 ? splitted[3].to_i : 0}}
   end
 
   define_version_constants({{`pkg-config rpm --modversion`.chomp.stringify}})

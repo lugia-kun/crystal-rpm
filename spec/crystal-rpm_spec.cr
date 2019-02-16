@@ -12,6 +12,22 @@ describe RPM do
     RPM::RPMVERSION.should start_with(RPM::PKGVERSION_COMP)
   end
 
+  it "has extracted numeric VERSIONs" do
+    sp = RPM::RPMVERSION.split(/[^0-9]+/)
+    RPM::PKGVERSION_MAJOR.should eq(sp[0].to_i)
+    RPM::PKGVERSION_MINOR.should eq(sp[1].to_i)
+    RPM::PKGVERSION_PATCH.should eq(sp[2].to_i)
+    if sp.size > 3
+      RPM::PKGVERSION_EXTRA.should eq(sp[3].to_i)
+      RPM::PKGVERSION_EXTRA.should_not eq(0)
+
+      # currently not supported, so we need to know if required.
+      sp.size.should be <= 4
+    else
+      RPM::PKGVERSION_EXTRA.should eq(0)
+    end
+  end
+
   describe ".[]" do
     it "can obtain macro value" do
       RPM["_usr"].should eq("/usr")
@@ -339,6 +355,20 @@ describe RPM::Transaction do
           iter = ts.init_iterator
           it "returns MatchIterator" do
             iter.class.should eq(RPM::MatchIterator)
+          end
+        end
+
+        describe "#db" do
+          db = nil
+          it "opens db" do
+            db = ts.db
+            db.should be_a(RPM::DB)
+          end
+
+          it "can generate iterator" do
+            iter = db.as(RPM::DB).init_iterator(RPM::DbiTag::Name)
+            a_installed_pkg = iter.first
+            a_installed_pkg.should_not be_nil
           end
         end
       end
