@@ -559,6 +559,7 @@ describe RPM::Version do
     end
 
     it "equals" do
+      (v1 == v2).should be_true
       v1.should eq(v2)
     end
 
