@@ -42,6 +42,14 @@ module RPM
       LibRPM.rpmvercmp(to_vre_epoch_zero, other.to_vre_epoch_zero)
     end
 
+    def newer?(other : Version)
+      self > other
+    end
+
+    def older?(other : Version)
+      self < other
+    end
+
     def to_vr
       @r.nil? ? @v.dup : "#{@v}-#{@r}"
     end
@@ -58,6 +66,12 @@ module RPM
     def to_vre_epoch_zero
       vr = to_vr
       @e.nil? ? "0:#{vr}" : "#{@e}:#{vr}"
+    end
+
+    def hash
+      h = @e.nil? ? 0_u64 : @e.as(Int).to_u64
+      h = (h << 1) ^ @r.hash
+      h = (h << 1) ^ @v.hash
     end
   end
 end

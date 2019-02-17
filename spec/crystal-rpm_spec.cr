@@ -450,3 +450,97 @@ describe RPM::Transaction do
     end
   end
 end
+
+describe RPM::Version do
+  a = RPM::Version.new("1.0.0-0.1m")
+  b = RPM::Version.new("0.9.0-1m")
+  c = RPM::Version.new("1.0.0-0.11m")
+  d = RPM::Version.new("0.9.0-1m", 1)
+
+  describe ".parse_evr" do
+    it "parses EVR format into Set of {Epoch, Version, Release}" do
+      RPM::Version.parse_evr("23:1.0.3-1suse").should eq({23, "1.0.3", "1suse"})
+      RPM::Version.parse_evr("1.0").should eq({nil, "1.0", nil})
+      RPM::Version.parse_evr("2.0-3").should eq({nil, "2.0", "3"})
+    end
+  end
+
+  describe "#<=>" do
+    it "can compare as Comparable" do
+      (a > b).should be_true
+      (a < c).should be_true
+      (a < d).should be_true
+    end
+  end
+
+  describe "#newer?" do
+    it "returns true if receiver is newer than given version" do
+      a.newer?(b).should be_true
+      c.newer?(a).should be_true
+      d.newer?(a).should be_true
+      a.newer?(a).should be_false
+    end
+  end
+
+  describe "#older?" do
+    it "returns true if receiver is older than given version" do
+      b.older?(a).should be_true
+      a.older?(c).should be_true
+      a.older?(d).should be_true
+      a.older?(a).should be_false
+    end
+  end
+
+  describe "#v" do
+    it "returns version part" do
+      d.v.should eq("0.9.0")
+    end
+  end
+
+  describe "#r" do
+    it "returns release part" do
+      d.r.should eq("1m")
+    end
+  end
+
+  describe "#e" do
+    it "returns epoch part" do
+      d.e.should eq(1)
+    end
+  end
+
+  describe "#to_s" do
+    it "returns stringified Version and Relase" do
+      b.to_s.should eq("0.9.0-1m")
+      d.to_s.should eq("0.9.0-1m")
+    end
+  end
+
+  describe "#to_vre" do
+    it "returns stringified Version, Release and Epoch" do
+      b.to_vre.should eq("0.9.0-1m")
+      d.to_vre.should eq("1:0.9.0-1m")
+    end
+  end
+
+  describe "zero-epoch and nil-epoch" do
+    v1 = RPM::Version.new("1-2")
+    v2 = RPM::Version.new("0:1-2")
+
+    it "will be nil for nil-epoch" do
+      v1.e.should be_nil
+    end
+
+    it "will be 0 for 0-epoch" do
+      v2.e.should eq(0)
+    end
+
+    it "equals" do
+      v1.should eq(v2)
+    end
+
+    it "equals their hash" do
+      v1.hash.should eq(v2.hash)
+    end
+  end
+end
