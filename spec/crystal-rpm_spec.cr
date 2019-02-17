@@ -91,6 +91,29 @@ describe "RPM::Lib" do
   end
 end
 
+describe RPM::Dependency do
+  prv1 = RPM::Provide.new("foo", RPM::Version.new("2", "1"),
+                          RPM::Sense::EQUAL, nil)
+  req1 = RPM::Require.new("foo", RPM::Version.new("1", "1"),
+                          RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
+  prv2 = RPM::Provide.new("foo", RPM::Version.new("2", "2"),
+                          RPM::Sense::EQUAL, nil)
+  req2 = RPM::Require.new("bar", RPM::Version.new("1", "1"),
+                          RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
+
+  describe "#satisfies?" do
+    it "returns true if dependencies satisfy" do
+      req1.satisfies?(prv1).should be_true
+      prv1.satisfies?(req1).should be_true
+    end
+
+    it "returns false if name does not overlap" do
+      req2.satisfies?(prv2).should be_false
+    end
+  end
+
+end
+
 describe RPM::File do
   f = RPM::File.new("path", "md5sum", "", 42_u32,
     Time.new(2019, 1, 1, 9, 0, 0), "owner", "group",
