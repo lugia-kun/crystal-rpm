@@ -119,10 +119,6 @@ module RPM
 
     macro define_dependency_class(name)
       class {{name}} < Dependency
-        def initislize(**args)
-          super(**args)
-        end
-
         def self.nametag
           Tag::{{name}}Name
         end
