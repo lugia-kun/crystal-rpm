@@ -120,18 +120,19 @@ describe RPM::File do
     43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
     RPM::FileState::NORMAL)
   it "has flags" do
-    f.config?
-    f.doc?
-    f.is_missingok?
-    f.is_noreplace?
-    f.is_specfile?
-    f.ghost?
-    f.license?
-    f.readme?
-    f.replaced?
-    f.notinstalled?
-    f.netshared?
-    f.missing?
+    f.symlink?.should be_false
+    f.config?.should be_false
+    f.doc?.should be_false
+    f.is_missingok?.should be_true
+    f.is_noreplace?.should be_false
+    f.is_specfile?.should be_true
+    f.ghost?.should be_false
+    f.license?.should be_false
+    f.readme?.should be_false
+    f.replaced?.should be_false
+    f.notinstalled?.should be_false
+    f.netshared?.should be_false
+    f.missing?.should be_false
   end
 end
 
