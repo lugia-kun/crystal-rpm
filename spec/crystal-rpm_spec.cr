@@ -93,13 +93,13 @@ end
 
 describe RPM::Dependency do
   prv1 = RPM::Provide.new("foo", RPM::Version.new("2", "1"),
-                          RPM::Sense::EQUAL, nil)
+    RPM::Sense::EQUAL, nil)
   req1 = RPM::Require.new("foo", RPM::Version.new("1", "1"),
-                          RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
+    RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
   prv2 = RPM::Provide.new("foo", RPM::Version.new("2", "2"),
-                          RPM::Sense::EQUAL, nil)
+    RPM::Sense::EQUAL, nil)
   req2 = RPM::Require.new("bar", RPM::Version.new("1", "1"),
-                          RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
+    RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
 
   describe "#satisfies?" do
     it "returns true if dependencies satisfy" do
@@ -111,14 +111,21 @@ describe RPM::Dependency do
       req2.satisfies?(prv2).should be_false
     end
   end
-
 end
 
 describe RPM::File do
-  f = RPM::File.new("path", "md5sum", "", 42_u32,
-    Time.local(2019, 1, 1, 9, 0, 0), "owner", "group",
-    43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
-    RPM::FileState::NORMAL)
+  f =
+    {% begin %}
+    RPM::File.new("path", "md5sum", "", 42_u32,
+                  {% if Time.class.methods.find { |x| x.name == "local" } %}
+                    Time.local(2019, 1, 1, 9, 0, 0),
+                  {% else %}
+                    Time.new(2019, 1, 1, 9, 0, 0),
+                  {% end %}
+                  "owner", "group",
+                  43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
+                  RPM::FileState::NORMAL)
+    {% end %}
   it "has flags" do
     f.symlink?.should be_false
     f.config?.should be_false
@@ -463,12 +470,14 @@ describe RPM::Transaction do
             ts.order
 
             probs = ts.check
+            bad = false
             probs.each do |prob|
+              bad = true
               STDERR.puts prob.to_s
             end
+            raise Exception.new("Transaction has problem") if bad
 
             ts.clean
-
             ts.commit
           ensure
             ts.db.close
