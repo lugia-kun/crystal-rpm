@@ -1,4 +1,7 @@
 module RPM
+  class ProblemSet
+  end
+
   # Stores Problem.
   #
   # Content changed on RPM 4.9
@@ -53,13 +56,14 @@ module RPM
   # No translation applies for VERIFY.
   #
   class Problem
+    @pset : ProblemSet?
     property ptr : LibRPM::Problem
 
     def finalize
-      LibRPM.rpmProblemFree(@ptr)
+      LibRPM.rpmProblemFree(@ptr) unless @ptr.null?
     end
 
-    def initialize(@ptr)
+    def initialize(@ptr, @pset = nil)
     end
 
     def initialize(type, pkg_nevr, key, alt_nevr, str, number)
@@ -92,6 +96,7 @@ module RPM
     end
 
     def to_s
+      return "#<RPM::Problem (null problem)>" if @ptr.null?
       ptr = LibRPM.rpmProblemString(@ptr)
       return "#<RPM::Problem (empty problem)>" if ptr.null?
       begin
@@ -103,6 +108,56 @@ module RPM
 
     def <=>(other)
       LibRPM.rpmProblemCompare(@ptr, other.ptr)
+    end
+  end
+
+  class ProblemSetIterator
+    include Iterator(Problem)
+
+    @pset : ProblemSet
+    @iter : LibRPM::ProblemSetIterator
+
+    def initialize(@pset, @iter)
+    end
+
+    def next
+      if LibRPM.rpmpsNextIterator(@iter) < 0
+        stop
+      else
+        Problem.new(LibRPM.rpmpsGetProblem(@iter), @pset)
+      end
+    end
+
+    def finalize
+      LibRPM.rpmpsFreeIterator(@iter)
+    end
+  end
+
+  # Set of Problems
+  class ProblemSet
+    include Iterable(Problem)
+
+    property ptr : LibRPM::ProblemSet
+
+    def initialize(@ptr)
+    end
+
+    def initialize(ts : Transaction)
+      ptr = LibRPM.rpmtsProblems(ts.ptr)
+      initialize(ptr)
+    end
+
+    def each
+      iter = LibRPM.rpmpsInitIterator(self.ptr)
+      ProblemSetIterator.new(self, iter)
+    end
+
+    def each(&block)
+      self.each.each { |x| yield x }
+    end
+
+    def finalize
+      LibRPM.rpmpsFree(@ptr) unless @ptr.null?
     end
   end
 end

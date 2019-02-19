@@ -116,7 +116,7 @@ end
 
 describe RPM::File do
   f = RPM::File.new("path", "md5sum", "", 42_u32,
-    Time.new(2019, 1, 1, 9, 0, 0), "owner", "group",
+    Time.local(2019, 1, 1, 9, 0, 0), "owner", "group",
     43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
     RPM::FileState::NORMAL)
   it "has flags" do
@@ -461,6 +461,12 @@ describe RPM::Transaction do
 
           begin
             ts.order
+
+            probs = ts.check
+            probs.each do |prob|
+              STDERR.puts prob.to_s
+            end
+
             ts.clean
 
             ts.commit

@@ -741,6 +741,7 @@ module RPM
     fun rpmpsGetProblem(ProblemSetIterator) : Problem
     fun rpmpsFree(ProblemSet) : ProblemSet
     fun rpmpsFreeIterator(ProblemSetIterator) : ProblemSetIterator
+    fun rpmpsNumProblems(ProblemSet) : Int
 
     # ## TagData APIs.
 

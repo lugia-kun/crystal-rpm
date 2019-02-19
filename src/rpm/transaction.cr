@@ -31,6 +31,13 @@ module RPM
       init_iterator(DbiTag::Packages, nil)
     end
 
+    def check
+      rc = LibRPM.rpmtsCheck(@ptr)
+      raise Exception.new("RPM: Failed to check transaction") if rc != 0
+
+      ProblemSet.new(self)
+    end
+
     def init_iterator(tag : DbiTag | DbiTagValue, val : String | Slice(UInt8) | Nil = nil)
       if val
         it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, val, val.size)
@@ -224,7 +231,7 @@ module RPM
     end
 
     def commit(callback : Proc? = nil)
-      self.flags = TransactionFlags::NONE
+      rc = 1
       set_notify_callback(callback) do
         rc = LibRPM.rpmtsRun(@ptr, nil, LibRPM::ProbFilterFlags::NONE)
         if rc == 0
@@ -233,16 +240,13 @@ module RPM
           msg = String.new(LibRPM.rpmlogMessage)
           raise Exception.new("#{self}: #{msg}")
         elsif rc > 0
-          ps = LibRPM.rpmtsProblems(@ptr)
-          psi = LibRPM.rpmpsInitIterator(ps)
-          while LibRPM.rpmpsNextIterator(psi) >= 0
-            problem = Problem.new(LibRPM.rpmpsGetProblem(psi))
-            STDERR.puts problem.str
+          ps = ProblemSet.new(self)
+          ps.each do |problem|
+            STDERR.puts problem.to_s
           end
-          LibRPM.rpmpsFreeIterator(psi)
-          LibRPM.rpmpsFree(ps)
         end
       end
+      rc
     end
 
     def commit(&block)
