@@ -150,8 +150,7 @@ module RPM
 
     alias CallbackReturnType = IO::FileDescriptor | Int32 | Nil
 
-    alias Callback = Proc(Package?, CallbackType, UInt64, UInt64,
-                          Pointer(Void), CallbackReturnType)
+    alias Callback = Proc(Package?, CallbackType, UInt64, UInt64, Pointer(Void), CallbackReturnType)
 
     class CallbackBoxData
       property transaction : Transaction
