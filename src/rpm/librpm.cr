@@ -103,6 +103,10 @@ module RPM
       UNPACK_ERROR       = (1_u32 << 13)
       CPIO_ERROR         = (1_u32 << 14)
       SCRIPT_ERROR       = (1_u32 << 15)
+      SCRIPT_START       = (1_u32 << 16)
+      SCRIPT_STOP        = (1_u32 << 17)
+      INST_STOP          = (1_u32 << 18)
+      ELEM_PROGRESS      = (1_u32 << 19)
     end
 
     alias CallbackData = Pointer(Void)
