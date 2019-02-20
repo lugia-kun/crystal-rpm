@@ -503,28 +503,26 @@ describe RPM::Transaction do
                    RPM::CallbackType::TRANS_STOP
                 pkg.should be_nil
               else
-                type.should eq(RPM::CallbackType::TRANS_START)
+                # other values are ignored.
               end
             end
             types << type
             nil
           end
           it "collects transaction callback types" do
-            types.should eq([RPM::CallbackType::TRANS_START,
-                             RPM::CallbackType::TRANS_PROGRESS,
-                             RPM::CallbackType::TRANS_STOP])
+            types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
+                                     RPM::CallbackType::TRANS_PROGRESS,
+                                     RPM::CallbackType::TRANS_STOP])
           end
         ensure
           ts.db.close
         end
         it "collects problems" do
           probs = RPM::ProblemSet.new(ts)
-          f = false
-          probs.each do |prob|
-            prob.to_s.should eq("package simple-1.0-0.i586 is already installed")
-            f = true
+          prob = probs.each.find do |prob|
+            prob.to_s == "package simple-1.0-0.i586 is already installed"
           end
-          f.should be_true
+          prob.should_not be_nil
         end
       end
     rescue e : Exception
