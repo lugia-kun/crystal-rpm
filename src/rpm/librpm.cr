@@ -847,7 +847,7 @@ module RPM
     fun rpmtsClean(Transaction) : Void
     fun rpmtsFree(Transaction) : Transaction
 
-    fun rpmtsSetNotifyCallback(Transaction, CallbackFunction, Relocation) : Int
+    fun rpmtsSetNotifyCallback(Transaction, CallbackFunction, Void*) : Int
 
     fun rpmtsRootDir(Transaction) : Pointer(UInt8)
     fun rpmtsSetRootDir(Transaction, UInt8*) : Int
@@ -860,6 +860,7 @@ module RPM
     fun rpmtsCreate : Transaction
     fun rpmtsAddInstallElement(Transaction, Header, FnpyKey, Int, Relocation) : Int
     fun rpmtsAddEraseElement(Transaction, Header, Int) : Int
+    fun rpmtsEmpty(Transaction) : Void
 
     # ## RC
     fun rpmReadConfigFiles(UInt8*, UInt8*) : Int
@@ -875,6 +876,7 @@ module RPM
   alias DbiTagValue = LibRPM::DbiTagVal
   alias FileState = LibRPM::FileState
   alias FileAttrs = LibRPM::FileAttrs
+  alias CallbackType = LibRPM::CallbackType
 
   alias Sense = LibRPM::Sense
   alias TransactionFlags = LibRPM::TransFlags

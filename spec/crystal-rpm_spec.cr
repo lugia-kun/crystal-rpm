@@ -487,6 +487,49 @@ describe RPM::Transaction do
         File.exists?(test_path).should be_false
       end
     end
+
+    describe "Test problem and callback" do
+      path = fixture("simple-1.0-0.i586.rpm")
+      pkg = RPM::Package.open(path)
+      RPM.transaction(tmproot) do |ts|
+        begin
+          ts.install(pkg, path)
+          types = [] of RPM::CallbackType
+          ts.commit do |pkg, type|
+            it "runs expectations in the block" do
+              case type
+              when RPM::CallbackType::TRANS_PROGRESS,
+                   RPM::CallbackType::TRANS_START,
+                   RPM::CallbackType::TRANS_STOP
+                pkg.should be_nil
+              else
+                type.should eq(RPM::CallbackType::TRANS_START)
+              end
+            end
+            types << type
+            nil
+          end
+          it "collects transaction callback types" do
+            types.should eq([RPM::CallbackType::TRANS_START,
+                             RPM::CallbackType::TRANS_PROGRESS,
+                             RPM::CallbackType::TRANS_STOP])
+          end
+        ensure
+          ts.db.close
+        end
+        it "collects problems" do
+          probs = RPM::ProblemSet.new(ts)
+          f = false
+          probs.each do |prob|
+            prob.to_s.should eq("package simple-1.0-0.i586 is already installed")
+            f = true
+          end
+          f.should be_true
+        end
+      end
+    rescue e : Exception
+      puts e
+    end
   end
 end
 

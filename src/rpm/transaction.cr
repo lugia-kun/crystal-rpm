@@ -4,7 +4,6 @@ module RPM
 
   class Transaction
     getter ptr : LibRPM::Transaction
-    property fdt : LibRPM::FD? = nil
     @db : DB? = nil
 
     def initialize(**opts)
@@ -149,22 +148,15 @@ module RPM
       nil
     end
 
-    class CallbackData
-      property pkg : Package?
-      property type : LibRPM::CallbackType
-      property amount : LibRPM::Loff
-      property total : LibRPM::Loff
-      property key : LibRPM::FnpyKey
+    alias CallbackReturnType = IO::FileDescriptor | Int32 | Nil
 
-      def initialize(@pkg, @type, @amount, @total, @key)
-      end
-    end
-
-    alias Callback = Proc((CallbackData?), IO::FileDescriptor | Pointer(Void))
+    alias Callback = Proc(Package?, CallbackType, UInt64, UInt64,
+                          Pointer(Void), CallbackReturnType)
 
     class CallbackBoxData
       property transaction : Transaction
       property callback : Callback
+      property fdt : FileDescriptor?
 
       def initialize(@transaction, @callback)
       end
@@ -182,34 +174,29 @@ module RPM
             pkg = Package.new(hdr)
           end
 
-          callback_data = CallbackData.new(pkg, type, amount, total, key)
-          ret = boxed.callback.call(callback_data)
+          ret = boxed.callback.call(pkg, type, amount, total, key)
 
           case type
-          when LibRPM::CallbackType::INST_OPEN_FILE
+          when CallbackType::INST_OPEN_FILE
             case ret
             when IO::FileDescriptor
               ino = ret.as(IO::FileDescriptor).fd
             when Int32
               ino = ret.as(Int32)
             else
-              return ret
+              return Pointer(Void).null
             end
-            fdt = LibRPM.fdDup(ino)
-            if fdt.null? || LibRPM.Ferror(fdt) != 0
-              errstr = String.new(LibRPM.Fstrerror(fdt))
-              raise "Can't use opend file #{key}: #{errstr}"
-            end
-            boxed.transaction.fdt = fdt
-            fdt.as(Pointer(Void))
-          when LibRPM::CallbackType::INST_CLOSE_FILE
-            if boxed.transaction.fdt
-              fd = boxed.transaction.fdt.as(LibRPM::FD)
-              LibRPM.Fclose(fd)
+            fdt = FileDescriptor.for_fd(ino)
+            boxed.fdt = fdt
+            fdt.fd.as(Pointer(Void))
+          when CallbackType::INST_CLOSE_FILE
+            if boxed.fdt
+              fd = boxed.fdt.as(FileDescriptor)
+              fd.close
             end
             Pointer(Void).null
           else
-            ret.as(Pointer(Void))
+            Pointer(Void).null
           end
         end
       else
@@ -230,12 +217,13 @@ module RPM
       end
     end
 
-    def commit(callback : Proc? = nil)
+    def commit(callback : Callback? = nil)
       rc = 1
       set_notify_callback(callback) do
         rc = LibRPM.rpmtsRun(@ptr, nil, LibRPM::ProbFilterFlags::NONE)
         if rc == 0
           @keys.clear
+          LibRPM.rpmtsEmpty(@ptr)
         elsif rc < 0
           msg = String.new(LibRPM.rpmlogMessage)
           raise Exception.new("#{self}: #{msg}")
@@ -249,7 +237,7 @@ module RPM
       rc
     end
 
-    def commit(&block)
+    def commit(&block : Callback)
       commit(block)
     end
   end
