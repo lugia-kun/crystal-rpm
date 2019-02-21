@@ -448,6 +448,45 @@ describe RPM::Transaction do
       end
     end
 
+    describe "Test problem and callback" do
+      path = fixture("simple-1.0-0.i586.rpm")
+      pkg = RPM::Package.open(path)
+      RPM.transaction(tmproot) do |ts|
+        begin
+          ts.install(pkg, path)
+          types = [] of RPM::CallbackType
+          ts.commit do |pkg, type|
+            it "runs expectations in the block" do
+              case type
+              when RPM::CallbackType::TRANS_PROGRESS,
+                   RPM::CallbackType::TRANS_START,
+                   RPM::CallbackType::TRANS_STOP
+                pkg.should be_nil
+              else
+                # other values are ignored.
+              end
+            end
+            types << type
+            nil
+          end
+          it "collects transaction callback types" do
+            types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
+                                     RPM::CallbackType::TRANS_PROGRESS,
+                                     RPM::CallbackType::TRANS_STOP])
+          end
+        ensure
+          ts.db.close
+        end
+        it "collects problems" do
+          probs = RPM::ProblemSet.new(ts)
+          prob = probs.each.find do |prob|
+            prob.to_s == "package simple-1.0-0.i586 is already installed"
+          end
+          prob.should_not be_nil
+        end
+      end
+    end
+
     describe "Test remove" do
       # TODO: RPM in OpenSUSE works with this semantic, but not in
       # others. This must be investigated...
@@ -486,47 +525,6 @@ describe RPM::Transaction do
         test_path = File.join(tmproot, "usr/share/simple/README")
         File.exists?(test_path).should be_false
       end
-    end
-
-    describe "Test problem and callback" do
-      path = fixture("simple-1.0-0.i586.rpm")
-      pkg = RPM::Package.open(path)
-      RPM.transaction(tmproot) do |ts|
-        begin
-          ts.install(pkg, path)
-          types = [] of RPM::CallbackType
-          ts.commit do |pkg, type|
-            it "runs expectations in the block" do
-              case type
-              when RPM::CallbackType::TRANS_PROGRESS,
-                   RPM::CallbackType::TRANS_START,
-                   RPM::CallbackType::TRANS_STOP
-                pkg.should be_nil
-              else
-                # other values are ignored.
-              end
-            end
-            types << type
-            nil
-          end
-          it "collects transaction callback types" do
-            types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
-                                     RPM::CallbackType::TRANS_PROGRESS,
-                                     RPM::CallbackType::TRANS_STOP])
-          end
-        ensure
-          ts.db.close
-        end
-        it "collects problems" do
-          probs = RPM::ProblemSet.new(ts)
-          prob = probs.each.find do |prob|
-            prob.to_s == "package simple-1.0-0.i586 is already installed"
-          end
-          prob.should_not be_nil
-        end
-      end
-    rescue e : Exception
-      puts e
     end
   end
 end
