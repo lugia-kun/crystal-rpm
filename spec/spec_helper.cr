@@ -11,18 +11,24 @@ macro set_compiler(cc, objpath, cflags)
   CFLAGS = {{cflags}}
   OBJPATH = {{objpath}}
 end
+
 {% begin %}
-{% a = run("./cc.cr").chomp.split(":") %}
-set_compiler({{a[0]}}, {{a[1]}},
-             {{ `pkg-config rpm --cflags`.stringify.chomp }})
+  {% a = run("./cc.cr").chomp.split(":") %}
+  {% maj = " -DVERSION_MAJOR=#{RPM::PKGVERSION_MAJOR}" %}
+  {% min = " -DVERSION_MINOR=#{RPM::PKGVERSION_MINOR}" %}
+  {% pat = " -DVERSION_PATCH=#{RPM::PKGVERSION_PATCH}" %}
+  set_compiler({{a[0]}}, {{a[1]}},
+               {{`pkg-config rpm --cflags`.stringify.chomp + maj + min + pat}})
 {% end %}
 
 {% if CC.size > 0 %}
-  {% l = `#{CC} #{CFLAGS.id} -c -o #{OBJPATH} ./spec/c-check.c && echo 1 || :` %}
+  {% com = "#{CC} #{CFLAGS.id} -c -o #{OBJPATH} ./spec/c-check.c && echo 1 || :" %}
+  {% puts com %}
+  {% l = `#{com.id}` %}
   {% if l.stringify.starts_with?("1") %}
     @[Link(ldflags: {{OBJPATH}})]
     lib CCheck
-      fun sizeof_spec_s() : LibC::SizeT
+      fun sizeof_spec_s() : LibC::Int
     end
   {% else %}
     module CCheck
@@ -32,5 +38,3 @@ set_compiler({{a[0]}}, {{a[1]}},
     end
   {% end %}
 {% end %}
-
-puts CCheck.sizeof_spec_s

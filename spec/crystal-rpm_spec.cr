@@ -623,3 +623,59 @@ describe RPM::Version do
     end
   end
 end
+
+describe RPM::Source do
+  a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
+  b = RPM::Source.new("http://example.com/fuga/fuga.tar.gz", 1, true)
+
+  describe "#fullname" do
+    it "returns full source name" do
+      a.fullname.should eq("http://example.com/hoge/hoge.tar.bz2")
+    end
+  end
+
+  describe "#to_s" do
+    it "returns full souce name" do
+      a.fullname.should eq("http://example.com/hoge/hoge.tar.bz2")
+    end
+  end
+
+  describe "#filename" do
+    it "returns basename of the source" do
+      a.filename.should eq("hoge.tar.bz2")
+    end
+  end
+
+  describe "#number" do
+    it "returns number assinged to source" do
+      a.number.should eq(0)
+      b.number.should eq(1)
+    end
+  end
+
+  describe "#no?" do
+    it "returns whether the source is packeged into src.rpm" do
+      a.no?.should be_false
+      b.no?.should be_true
+    end
+  end
+end
+
+describe RPM::Spec do
+  sz_spec_s = CCheck.sizeof_spec_s
+  case sz_spec_s
+  when -1
+    {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+      pending "sizeof rpmSpec_s did not test (compilation error)" do
+      end
+    {% else %}
+      it "sieof rpmSpec_s did not test (it's not public in rpm 4.9 or later)" do
+        true.should be_true
+      end
+    {% end %}
+  else
+    it "sizeof rpmSpec_s" do
+      sizeof(RPM::LibRPM::Spec_s).should eq(sz_spec_s)
+    end
+  end
+end

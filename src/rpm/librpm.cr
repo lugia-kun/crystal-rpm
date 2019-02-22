@@ -23,7 +23,7 @@ module RPM
 
     # If `PKGVERSION` has 4 parts, `PKGVERSION_EXTRA` contains the fourth part.
     # For example, if the version is `4.14.2.1`, `PKGVERSION_EXTRA` will be
-    # set to `1` (note that string).
+    # set to `1`.
     #
     # `PKGVERSION_EXTRA` will be 0 if fourth part does not exist.
     PKGVERSION_EXTRA = {{splitted.size > 3 ? splitted[3].to_i : 0}}
@@ -39,19 +39,99 @@ module RPM
 
   define_3_parts_version({{PKGVERSION_MAJOR}}, {{PKGVERSION_MINOR}}, {{PKGVERSION_PATCH}})
 
+  # Definition of interface with librpm.
+  #
   @[Link(ldflags: "`pkg-config rpm --libs`")]
   lib LibRPM
+    # Dev note: Do not add a version restriction fence (i.e.
+    #           `{% if compare_versions() %} ... {% end %}`) unless
+    #           there are interface incompatibilities,
+    #           such as parameter type or number, return type,
+    #           type definition, or enum value changed.
+    #
+    #           Changes like which a function or an enum value is
+    #           introduced or removed does not classify to an interface
+    #           incompatibility.
+
     # ## Internal types
+    alias Int = LibC::Int
+    alias UInt = LibC::UInt
+    alias SizeT = LibC::SizeT
+
+    # BUFSIZ is in stdio.h, the value is for glibc-2.28 on x86_64 linux
+    BUFSIZ = 8192
+
+    # Spec structure definition in RPM 4.8.
+    struct SpecLines
+      sl_lines : Pointer(UInt8*)
+      sl_nalloc : Int
+      ls_nlines : Int
+    end
+
+    struct SpecTags
+      st_t : Pointer(Void) # Not supported
+      st_nalloc : Int
+      st_ntags : Int
+    end
+
+    struct Source_s
+      full_source : Pointer(UInt8)
+      source : Pointer(UInt8)
+      flags : Int
+      num : UInt32
+      next : Pointer(Source_s)
+    end
+
+    {% begin %}
+    struct Spec_s
+      spec_file : Pointer(UInt8)
+      buildroot : Pointer(UInt8)
+      build_subdir : Pointer(UInt8)
+      sl : SpecLines
+      st : SpecTags
+      fileStack : Pointer(Void)
+      lbuf : {
+        {% for i in 0...(10*BUFSIZ) %}
+          UInt8,
+        {% end %}
+      }
+      lbuf_ptr : Pointer(UInt8)
+      nextpeec_c : UInt8
+      nextline : Pointer(UInt8)
+      line : Pointer(UInt8)
+      line_num : Int
+      read_stack : Pointer(Void) # Not supported
+      build_restrictions : Header
+      ba_specs : Spec
+      ba_names : Pointer(UInt8*)
+      ba_count : Int
+      recursing : Int
+      force : Int
+      anyarch : Int
+      pass_phrase : Pointer(UInt8*)
+      time_check : Int
+      cookie : Pointer(UInt8)
+      sources : Pointer(Source_s)
+      num_sources : Int
+      no_source : Int
+      source_rpm_name : Pointer(UInt8)
+      source_pkg_id : Pointer(UInt8)
+      source_header : Header
+      source_cpio_list : FileInfo
+      macros : MacroContext
+      prep : StringBuf
+      build : StringBuf
+      install : StringBuf
+      check : StringBuf
+      clean : StringBuf
+    end
+    {% end %}
 
     alias Count = UInt32
     alias RPMFlags = UInt32
     alias TagVal = Int32
     alias DbiTagVal = TagVal
     alias Loff = UInt64
-
-    alias Int = LibC::Int
-    alias UInt = LibC::UInt
-    alias SizeT = LibC::SizeT
 
     type Header = Pointer(Void)
     type HeaderIterator = Pointer(Void)
@@ -67,6 +147,13 @@ module RPM
     type TagData = Pointer(Void)
     type Relocation = Pointer(Void)
     type FD = Pointer(Void)
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+      type Spec = Pointer(Spec_s)
+    {% else %}
+      type Spec = Pointer(Void)
+    {% end %}
+    type StringBuf = Pointer(Void)
+    type FileInfo = Pointer(Void)
 
     alias RPMDs = DependencySet
     alias RPMPs = ProblemSet
@@ -74,6 +161,7 @@ module RPM
     alias RPMTd = TagData
     alias RPMTs = Transaction
     alias RPMDb = Database
+    alias RPMFi = FileInfo
     alias RPMDbMatchIterator = DatabaseMatchIterator
 
     alias ErrorMsg = Pointer(UInt8)
@@ -868,6 +956,31 @@ module RPM
 
     # ## RC
     fun rpmReadConfigFiles(UInt8*, UInt8*) : Int
+
+    # ## Spec
+    # RPM 4.8 APIs.
+    fun parseSpec(Transaction, UInt8*, UInt8*, UInt8*, Int, UInt8*, UInt8*, Int, Int) : Int
+    fun rpmtsSpec(Transaction) : Spec
+
+    # RPM 4.9 APIs.
+    @[Flags]
+    enum SourceFlags : RPMFlags
+      ISSOURCE = (1_u32 << 0)
+      ISPATCH  = (1_u32 << 1)
+      ISICON   = (1_u32 << 2)
+      ISNO     = (1_u32 << 3)
+    end
+
+    @[Flags]
+    enum SpecFlags : RPMFlags
+      NONE    = 0
+      ANYARCH = (1_u32 << 0)
+      FORCE   = (1_u32 << 1)
+      NOLANG  = (1_u32 << 2)
+      NOUTF8  = (1_u32 << 3)
+    end
+
+    fun rpmSpecParse(UInt8*, SpecFlags, UInt8*) : Spec
   end # LibRPM
 
   # Exposed Types
