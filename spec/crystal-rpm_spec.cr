@@ -682,13 +682,39 @@ describe RPM::Spec do
   {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
     if sz_spec_s != -1
       it "offsetof members in rpmSpec_s" do
-        RPM::LibRPM::Spec_s.offsetof(spec_file).should eq(CCheck.offset_spec_s("specFile"))
-        RPM::LibRPM::Spec_s.offsetof(lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
-        RPM::LibRPM::Spec_s.offsetof(sources).should eq(CCheck.offset_spec_s("sources"))
-        RPM::LibRPM::Spec_s.offsetof(packages).should eq(CCheck.offset_spec_s("packages"))
+        RPM::LibRPM::Spec_s.offsetof(@spec_file).should eq(CCheck.offset_spec_s("specFile"))
+        RPM::LibRPM::Spec_s.offsetof(@lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
+        RPM::LibRPM::Spec_s.offsetof(@sources).should eq(CCheck.offset_spec_s("sources"))
+        RPM::LibRPM::Spec_s.offsetof(@packages).should eq(CCheck.offset_spec_s("packages"))
       end
     else
       pending "offsetof members in rpmSpec_s (compilation error)" do
+      end
+    end
+  {% end %}
+
+  sz_pkg_s = CCheck.sizeof_package_s
+  case sz_pkg_s
+  when -1
+    {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+      pending "sizeof rpmPackage_s (compilation error)" do
+      end
+    {% else %}
+      it "sizeof rpmPackage_s (it's not public in rpm 4.9 or later)" do
+        true.should be_true
+      end
+    {% end %}
+  else
+    it "sizeof Package_s" do
+      sizeof(RPM::LibRPM::Package_s).should eq(sz_pkg_s)
+    end
+  end
+
+  {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+    if sz_pkg_s != -1
+      it "offsetof members in Package_s" do
+        RPM::LibRPM::Package_s.offsetof(@header).should eq(CCheck.offset_package_s("header"))
+        RPM::LibRPM::Package_s.offsetof(@next).should eq(CCheck.offset_package_s("next"))
       end
     end
   {% end %}
@@ -702,6 +728,13 @@ describe RPM::Spec do
       buildroot = buildroot.sub(/%{version}/i, "1.0")
       buildroot = buildroot.sub(/%{release}/i, "0")
       spec.buildroot.should eq(buildroot)
+    end
+
+    it "#packages" do
+      pkgs = spec.packages
+      pkgs.size.should eq(2)
+      pkgs.any? { |x| x[RPM::Tag::Name] == "a" }.should be_true
+      pkgs.any? { |x| x[RPM::Tag::Name] == "a-devel" }.should be_true
     end
   end
 end

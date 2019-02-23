@@ -42,25 +42,43 @@ end
       def self.offset_spec_s(f : String)
         return -1
       end
+
+      def self.sizeof_package_s()
+        return -1
+      end
+
+      def self.offset_package_s(f : String)
+        return -1
+      end
     end
   {% end %}
 {% end %}
 
-struct RPM::LibRPM::Spec_s
-  macro offsetof(member)
-    Proc(Int64).new do
-      x = uninitialized RPM::LibRPM::Spec_s
-      x.__offsetof_{{member}} - pointerof(x).as(Pointer(UInt8))
-    end.call
-  end
+module OffsetOf
+  macro included
+    macro method_missing(call)
+      \{% name_s = call.name.id.stringify %}
+      \{% if name_s.starts_with?("__offsetof_") %}
+        \{% mem = name_s.gsub(/^__offsetof_/, "") %}
+        pointerof(@\{{mem.id}}).as(Pointer(UInt8))
+      \{% else %}
+        \{% raise "method #{call.name.id} undefined for {{@type.name.id}}" %}
+      \{% end %}
+    end
 
-  macro method_missing(call)
-    {% name_s = call.name.id.stringify %}
-    {% if name_s.starts_with?("__offsetof_") %}
-      {% mem = name_s.gsub(/^__offsetof_/, "") %}
-      pointerof(@{{mem.id}}).as(Pointer(UInt8))
-    {% else %}
-      {% raise "method #{call.name.id} undefined" %}
-    {% end %}
+    macro offsetof(member)
+      Proc(Int64).new do
+        x = uninitialized {{@type.name.id}}
+        x.__offsetof_\{{member.id.gsub(/^@/, "")}} - pointerof(x).as(Pointer(UInt8))
+      end.call
+    end
   end
+end
+
+struct RPM::LibRPM::Spec_s
+  include OffsetOf
+end
+
+struct RPM::LibRPM::Package_s
+  include OffsetOf
 end

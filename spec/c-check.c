@@ -31,27 +31,30 @@
    (rpm_version_maj_eq((maj)) && VERSION_MINOR < (min)) ||          \
    (rpm_version_majmin_eq((maj), (min)) && VERSION_PATCH < (pat)))
 
+#define SPEC_S_OFFSET(offsz, member_str, type, mem) \
+  do {                                              \
+    if (strcmp(member_str, #mem) == 0) {            \
+      offsz = offsetof(type, mem);                  \
+    }                                               \
+  } while(0)
+
+
+static int int_overflow_check(size_t szv, int value_overflowed)
+{
+  if (szv > INT_MAX) {
+    return value_overflowed;
+  }
+  return (int)szv;
+}
 
 int sizeof_spec_s(void)
 {
 #if rpm_version_less(4, 9, 0)
-  size_t ssz;
-  ssz = sizeof(struct rpmSpec_s);
-  if (ssz > INT_MAX) {
-    return -2;
-  }
-  return (int)ssz;
+  return int_overflow_check(sizeof(struct rpmSpec_s), -2);
 #else
   return -1;
 #endif
 }
-
-#define SPEC_S_OFFSET(offsz, member_str, mem)      \
-  do {                                             \
-    if (strcmp(member_str, #mem) == 0) {           \
-      offsz = offsetof(struct rpmSpec_s, mem);     \
-    }                                              \
-  } while(0)
 
 int offset_spec_s(const char *member)
 {
@@ -59,18 +62,42 @@ int offset_spec_s(const char *member)
   size_t offsz;
   offsz = (size_t)-1;
 
-  SPEC_S_OFFSET(offsz, member, specFile);
-  SPEC_S_OFFSET(offsz, member, lbufPtr);
-  SPEC_S_OFFSET(offsz, member, sources);
-  SPEC_S_OFFSET(offsz, member, packages);
+  SPEC_S_OFFSET(offsz, member, struct rpmSpec_s, specFile);
+  SPEC_S_OFFSET(offsz, member, struct rpmSpec_s, lbufPtr);
+  SPEC_S_OFFSET(offsz, member, struct rpmSpec_s, sources);
+  SPEC_S_OFFSET(offsz, member, struct rpmSpec_s, packages);
 
   if (offsz >= sizeof(struct rpmSpec_s)) {
     return -1;
   }
-  if (offsz > INT_MAX) {
-    return -2;
+  return int_overflow_check(offsz, -2);
+#else
+  return -1;
+#endif
+}
+
+int sizeof_package_s(void)
+{
+#if rpm_version_less(4, 9, 0)
+  return int_overflow_check(sizeof(struct Package_s), -2);
+#else
+  return -1;
+#endif
+}
+
+int offset_package_s(const char *member)
+{
+#if rpm_version_less(4, 9, 0)
+  size_t offsz;
+  offsz = (size_t)-1;
+
+  SPEC_S_OFFSET(offsz, member, struct Package_s, header);
+  SPEC_S_OFFSET(offsz, member, struct Package_s, next);
+
+  if (offsz >= sizeof(struct Package_s)) {
+    return -1;
   }
-  return (int)offsz;
+  return int_overflow_check(offsz, -2);
 #else
   return -1;
 #endif

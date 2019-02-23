@@ -91,6 +91,8 @@ module RPM
       auto_prov : Int
       pre_in_file : Pointer(UInt8)
       post_in_file : Pointer(UInt8)
+      pre_un_file : Pointer(UInt8)
+      post_un_file : Pointer(UInt8)
       pre_trans_file : Pointer(UInt8)
       post_trans_file : Pointer(UInt8)
       verify_file : Pointer(UInt8)
@@ -99,7 +101,7 @@ module RPM
       trigger_files : Pointer(Void) # not supported
       file_file : StringBuf
       file_list : StringBuf
-      package : Pointer(Package_s)
+      next : Pointer(Package_s)
     end
 
     struct Spec_s

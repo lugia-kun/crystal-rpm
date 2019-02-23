@@ -1,6 +1,6 @@
 module RPM
   abstract class SpecCommonBase
-    abstract def initialize(specfile : String)
+    abstract def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
     abstract def buildroot : String
     abstract def packages : Array(RPM::Package)
   end
@@ -10,9 +10,10 @@ module RPM
     getter ts : LibRPM::Transaction
     @pkgs : Array(RPM::Package)? = nil
 
-    def initialize(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::NONE, buildroot : String? = nil)
+    def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
       ts = LibRPM.rpmtsCreate
-      ret = LibRPM.parseSpec(ts, specfile, "/", buildroot, 0, "", nil, 1, 1)
+      ret = LibRPM.parseSpec(ts, specfile, "/", buildroot, 0, "", nil,
+                             flags.anyarch?, flags.force?)
       if ret != 0 || ts.null?
         raise Exception.new("specfile \"#{specfile}\" parsing failed")
       end
@@ -82,9 +83,7 @@ module RPM
       end
     end
 
-    # Sets FORCE in default. (RPM 4.8 does not check sources, so for
-    # backward compatibility)
-    def initialize(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE, buildroot : String? = nil)
+    def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
       spec = LibRPM.rpmSpecParse(specfile, flags, buildroot)
       if spec.null?
         raise Exception.new("specfile \"#{specfile}\" parsing failed")
@@ -134,8 +133,8 @@ module RPM
       {% raise "RPM::Spec must be subclass of RPM::SpecCommonBase" %}
     {% end %}
 
-    def self.open(specfile : String)
-      new(specfile)
+    def self.open(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE | LibRPM::SpecFlags::ANYARCH, buildroot : String? = nil)
+      new(specfile, flags, buildroot)
     end
   end
 end
