@@ -176,6 +176,10 @@ module RPM
     {% end %}
     type StringBuf = Pointer(Void)
     type FileInfo = Pointer(Void)
+    type SpecPkgIter = Pointer(Void)
+    type SpecPkg = Pointer(Void)
+    type SpecSrcIter = Pointer(Void)
+    type SpecSrc = Pointer(Void)
 
     alias RPMDs = DependencySet
     alias RPMPs = ProblemSet

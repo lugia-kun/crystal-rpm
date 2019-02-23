@@ -2,11 +2,13 @@ module RPM
   abstract class SpecCommonBase
     abstract def initialize(specfile : String)
     abstract def buildroot : String
+    abstract def packages : Array(RPM::Package)
   end
 
   class Spec48 < SpecCommonBase
     getter ptr : LibRPM::Spec
     getter ts : LibRPM::Transaction
+    @pkgs : Array(RPM::Package)? = nil
 
     def initialize(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::NONE, buildroot : String? = nil)
       ts = LibRPM.rpmtsCreate
@@ -25,6 +27,20 @@ module RPM
       String.new(@ptr.value.buildroot)
     end
 
+    def packages
+      if @pkgs.nil?
+        arr = Array(RPM::Package).new
+        pkgs = @ptr.value.packages
+        while !pkgs.null?
+          arr << RPM::Package.new(pkgs.value.header)
+          pkgs = pkgs.value.next
+        end
+        @pkgs = arr
+      else
+        @pkgs.as(Array(RPM::Package))
+      end
+    end
+
     def finalize
       LibRPM.rpmtsFree(@ts)
     end
@@ -32,7 +48,39 @@ module RPM
 
   class Spec49 < SpecCommonBase
     getter ptr : LibRPM::Spec
-    getter hdr : Package? = nil
+    @hdr : Package? = nil
+    @pkgs : Array(RPM::Package)? = nil
+
+    class PackageIterator
+      @iter : LibRPM::SpecPkgIter
+      @spec : Spec49
+
+      include Iterator(RPM::Package)
+
+      def initialize(@spec)
+        iter = LibRPM.rpmSpecPkgIterInit(@spec.ptr)
+        raise Exception.new("SpecPkgIter initialization failed") if iter.null?
+        @iter = iter
+      end
+
+      def finalize
+        @iter = LibRPM.rpmSpecPkgIterFree(@iter)
+      end
+
+      def next
+        pkg = LibRPM.rpmSpecPkgIterNext(@iter)
+        if pkg.null?
+          stop
+        else
+          RPM::Package.new(LibRPM.rpmSpecPkgHeader(pkg))
+        end
+      end
+
+      def rewind
+        finalize
+        initialize(@spec)
+      end
+    end
 
     # Sets FORCE in default. (RPM 4.8 does not check sources, so for
     # backward compatibility)
@@ -58,6 +106,15 @@ module RPM
         root.as(String)
       else
         RPM["buildroot"]
+      end
+    end
+
+    def packages
+      if @pkgs.nil?
+        iter = PackageIterator.new(self)
+        @pkgs = iter.map { |x| x }
+      else
+        @pkgs.as(Array(RPM::Package))
       end
     end
 
