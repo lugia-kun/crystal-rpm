@@ -697,10 +697,10 @@ describe RPM::Spec do
   case sz_pkg_s
   when -1
     {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-      pending "sizeof rpmPackage_s (compilation error)" do
+      pending "sizeof Package_s (compilation error)" do
       end
     {% else %}
-      it "sizeof rpmPackage_s (it's not public in rpm 4.9 or later)" do
+      it "sizeof Package_s (it's not public in rpm 4.9 or later)" do
         true.should be_true
       end
     {% end %}

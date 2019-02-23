@@ -111,7 +111,7 @@ module RPM
     def packages
       if @pkgs.nil?
         iter = PackageIterator.new(self)
-        @pkgs = iter.map { |x| x }
+        @pkgs = iter.to_a
       else
         @pkgs.as(Array(RPM::Package))
       end

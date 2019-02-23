@@ -1011,6 +1011,11 @@ module RPM
     fun rpmSpecParse(UInt8*, SpecFlags, UInt8*) : Spec
     fun rpmSpecFree(Spec) : Spec
     fun rpmSpecSourceHeader(Spec) : Header
+    fun rpmSpecPkgIterInit(Spec) : SpecPkgIter
+    fun rpmSpecPkgIterNext(SpecPkgIter) : SpecPkg
+    fun rpmSpecPkgFree(SpecPkgIter) : SpecPkgIter
+    fun rpmSpecPkgIterFree(SpecPkgIter) : SpecPkgIter
+    fun rpmSpecPkgHeader(SpecPkg) : Header
   end # LibRPM
 
   # Exposed Types
