@@ -20,11 +20,63 @@ dependencies:
 require "rpm"
 ```
 
-TODO: Write usage instructions here
+The development files (pkg-config file) of [RPM] is
+required. Typically, it can be installed by `yum install rpm-devel` on
+CentOS or Red Hat, `dnf install rpm-devel` on Fedora, and `zypper in
+rpm-devel` on openSUSE or SLES.
+
+### Inspect package
+
+```crystal
+pkg = RPM::Package.open("foobar-1.0-0.x86_64.rpm")
+puts pkg[RPM::Tag::Name] # => "foobar"
+puts pkg[RPM::Tag::Arch] # => "x86_64"
+puts pkg[RPM::Tag::Summary] # => (Content of Summary)
+# and so on...
+
+pkg.requires # => Array of Requires.
+pkg.provides # => Array of Provides.
+pkg.conflicts # => Array of Conflicts.
+pkg.obsoletes # => Array of Obsolstes.
+```
+
+### Install package
+
+```crystal
+RPM.transaction do |ts|
+  path = "pkg_to_install-1.0-0.x86_64.rpm"
+  pkg = RPM::Package.open(path)
+  begin
+    ts.install(pkg, path) # Add installation package. Package path is required.
+    ts.commit   # Run Transaction
+  ensure
+    ts.db.close # must close Database.
+  end
+end
+```
+
+### Remove package
+
+Currently, the following code does not work unless you are using
+OpenSUSE.
+
+```crystal
+RPM.transaction do |ts|
+  begin
+    ts.delete(pkg)
+    ts.order    # Order and Clean is not mandatory.
+    ts.clean
+    ts.commit   # Run Transaction
+  ensure
+    ts.db.close # must close Database.
+  end
+end
+```
 
 ## Development
 
-TODO: Write development instructions here
+The definitiions of structs are written by hand. Tests can check their
+size and member offsets if you have a C compiler (optional).
 
 [fakechroot] (recommended) or root permission (i.e., `sudo`) is
 required to run `crystal spec`, since this spec uses `chroot()`.
