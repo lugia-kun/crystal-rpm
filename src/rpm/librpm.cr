@@ -102,7 +102,6 @@ module RPM
       package : Pointer(Package_s)
     end
 
-    {% begin %}
     struct Spec_s
       spec_file : Pointer(UInt8)
       buildroot : Pointer(UInt8)
@@ -111,11 +110,13 @@ module RPM
       sl : Pointer(SpecLines)
       st : Pointer(SpecTags)
       fileStack : Pointer(Void) # Not supported
+      {% begin %}
       lbuf : {
         {% for i in 0...(10*BUFSIZ) %}
           UInt8,
         {% end %}
       }
+      {% end %}
       lbuf_ptr : Pointer(UInt8)
       nextpeec_c : UInt8
       nextline : Pointer(UInt8)
@@ -147,7 +148,6 @@ module RPM
       clean : StringBuf
       packages : Pointer(Package_s)
     end
-    {% end %}
 
     alias Count = UInt32
     alias RPMFlags = UInt32
