@@ -30,6 +30,8 @@ end
     lib CCheck
       fun sizeof_spec_s() : LibC::Int
       fun offset_spec_s(UInt8*) : LibC::Int
+      fun sizeof_package_s() : LibC::Int
+      fun offset_package_s(UInt8*) : LibC::Int
     end
   {% else %}
     module CCheck
