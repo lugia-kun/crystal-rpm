@@ -1003,6 +1003,8 @@ module RPM
     end
 
     fun rpmSpecParse(UInt8*, SpecFlags, UInt8*) : Spec
+    fun rpmSpecFree(Spec) : Spec
+    fun rpmSpecSourceHeader(Spec) : Header
   end # LibRPM
 
   # Exposed Types
