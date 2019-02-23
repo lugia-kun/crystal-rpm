@@ -666,10 +666,10 @@ describe RPM::Spec do
   case sz_spec_s
   when -1
     {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-      pending "sizeof rpmSpec_s did not test (compilation error)" do
+      pending "sizeof rpmSpec_s (compilation error)" do
       end
     {% else %}
-      it "sieof rpmSpec_s did not test (it's not public in rpm 4.9 or later)" do
+      it "sizeof rpmSpec_s (it's not public in rpm 4.9 or later)" do
         true.should be_true
       end
     {% end %}
@@ -678,4 +678,18 @@ describe RPM::Spec do
       sizeof(RPM::LibRPM::Spec_s).should eq(sz_spec_s)
     end
   end
+
+  {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+    if sz_spec_s != -1
+      it "offsetof members in rpmSpec_s" do
+        RPM::LibRPM::Spec_s.offsetof(spec_file).should eq(CCheck.offset_spec_s("specFile"))
+        RPM::LibRPM::Spec_s.offsetof(lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
+        RPM::LibRPM::Spec_s.offsetof(sources).should eq(CCheck.offset_spec_s("sources"))
+        RPM::LibRPM::Spec_s.offsetof(packages).should eq(CCheck.offset_spec_s("packages"))
+      end
+    else
+      pending "offsetof members in rpmSpec_s (compilation error)" do
+      end
+    end
+  {% end %}
 end

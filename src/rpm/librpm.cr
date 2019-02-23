@@ -82,14 +82,35 @@ module RPM
       next : Pointer(Source_s)
     end
 
+    struct Package_s
+      header : Header
+      ds : DependencySet
+      cpio_list : FileInfo
+      icon : Pointer(Source_s)
+      auto_req : Int
+      auto_prov : Int
+      pre_in_file : Pointer(UInt8)
+      post_in_file : Pointer(UInt8)
+      pre_trans_file : Pointer(UInt8)
+      post_trans_file : Pointer(UInt8)
+      verify_file : Pointer(UInt8)
+      special_doc : StringBuf
+      special_doc_dir : Pointer(UInt8)
+      trigger_files : Pointer(Void) # not supported
+      file_file : StringBuf
+      file_list : StringBuf
+      package : Pointer(Package_s)
+    end
+
     {% begin %}
     struct Spec_s
       spec_file : Pointer(UInt8)
       buildroot : Pointer(UInt8)
       build_subdir : Pointer(UInt8)
-      sl : SpecLines
-      st : SpecTags
-      fileStack : Pointer(Void)
+      rootdir : Pointer(UInt8)
+      sl : Pointer(SpecLines)
+      st : Pointer(SpecTags)
+      fileStack : Pointer(Void) # Not supported
       lbuf : {
         {% for i in 0...(10*BUFSIZ) %}
           UInt8,
@@ -124,6 +145,7 @@ module RPM
       install : StringBuf
       check : StringBuf
       clean : StringBuf
+      packages : Pointer(Package_s)
     end
     {% end %}
 
