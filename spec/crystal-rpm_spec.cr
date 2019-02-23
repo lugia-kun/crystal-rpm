@@ -692,4 +692,16 @@ describe RPM::Spec do
       end
     end
   {% end %}
+
+  describe "sample specfile" do
+    spec = RPM::Spec.open(fixture("a.spec"))
+
+    it "#buildroot" do
+      buildroot = RPM["buildroot"]
+      buildroot = buildroot.sub(/%{name}/i, "a")
+      buildroot = buildroot.sub(/%{version}/i, "1.0")
+      buildroot = buildroot.sub(/%{release}/i, "0")
+      spec.buildroot.should eq(buildroot)
+    end
+  end
 end

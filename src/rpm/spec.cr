@@ -69,5 +69,9 @@ module RPM
     {% unless Spec.ancestors.find { |x| x == SpecCommonBase } %}
       {% raise "RPM::Spec must be subclass of RPM::SpecCommonBase" %}
     {% end %}
+
+    def self.open(specfile : String)
+      new(specfile)
+    end
   end
 end

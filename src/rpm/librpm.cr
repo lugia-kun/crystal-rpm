@@ -41,7 +41,7 @@ module RPM
 
   # Definition of interface with librpm.
   #
-  @[Link(ldflags: "`pkg-config rpm --libs`")]
+  @[Link(ldflags: "`pkg-config rpm --libs` -lrpmbuild")]
   lib LibRPM
     # Dev note: Do not add a version restriction fence (i.e.
     #           `{% if compare_versions() %} ... {% end %}`) unless
