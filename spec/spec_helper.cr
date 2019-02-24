@@ -32,6 +32,8 @@ end
       fun offset_spec_s(UInt8*) : LibC::Int
       fun sizeof_package_s() : LibC::Int
       fun offset_package_s(UInt8*) : LibC::Int
+      fun sizeof_buildarguments_s() : LibC::Int
+      fun offset_buildarguments_s(UInt8*) : LibC::Int
     end
   {% else %}
     module CCheck
@@ -48,6 +50,14 @@ end
       end
 
       def self.offset_package_s(f : String)
+        return -1
+      end
+
+      def self.sizeof_buildarguments_s()
+        return -1
+      end
+
+      def self.offset_buildarguments_s(f : String)
         return -1
       end
     end
@@ -80,5 +90,9 @@ struct RPM::LibRPM::Spec_s
 end
 
 struct RPM::LibRPM::Package_s
+  include OffsetOf
+end
+
+struct RPM::LibRPM::BuildArguments_s
   include OffsetOf
 end

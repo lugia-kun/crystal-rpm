@@ -722,6 +722,26 @@ describe RPM::Spec do
     end
   {% end %}
 
+  sz_bta_s = CCheck.sizeof_buildarguments_s
+  case sz_bta_s
+  when -1
+    pending "sizoef BuildArguments_s (compilation error)" do
+    end
+
+    pending "offsetof members in BuildArguments_s (compilation error)" do
+    end
+  else
+    it "sizeof BuildArguments_s" do
+      sizeof(RPM::LibRPM::BuildArguments_s).should eq(sz_bta_s)
+    end
+
+    it "offsetof members in BuildArguments_s" do
+      RPM::LibRPM::BuildArguments_s.offsetof(@rootdir).should eq(CCheck.offset_buildarguments_s("rootdir"))
+      RPM::LibRPM::BuildArguments_s.offsetof(@build_amount).should eq(CCheck.offset_buildarguments_s("buildAmount"))
+
+    end
+  end
+
   describe "sample specfile" do
     spec = RPM::Spec.open(fixture("a.spec"))
 

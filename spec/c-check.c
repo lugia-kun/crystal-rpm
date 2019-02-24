@@ -5,6 +5,7 @@
 
 // typedef off_t _IO_off64_t;
 
+#include <rpm/rpmcli.h>
 #include <rpm/rpmspec.h>
 
 #ifndef VERSION_MAJOR
@@ -101,4 +102,20 @@ int offset_package_s(const char *member)
 #else
   return -1;
 #endif
+}
+
+int sizeof_buildarguments_s(void)
+{
+  return int_overflow_check(sizeof(struct rpmBuildArguments_s), -2);
+}
+
+int offset_buildarguments_s(const char *member)
+{
+  size_t offsz;
+  offsz = (size_t)-1;
+
+  SPEC_S_OFFSET(offsz, member, struct rpmBuildArguments_s, rootdir);
+  SPEC_S_OFFSET(offsz, member, struct rpmBuildArguments_s, buildAmount);
+
+  return int_overflow_check(offsz, -1);
 }

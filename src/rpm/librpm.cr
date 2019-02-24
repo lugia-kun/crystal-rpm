@@ -151,6 +151,31 @@ module RPM
       packages : Pointer(Package_s)
     end
 
+    struct BuildArguments_s
+      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        qva : QueryFlags
+        build_amount : Int
+        build_root : Pointer(UInt8)
+        targets : Pointer(UInt8)
+        pass_phrase : Pointer(UInt8)
+        cookie : Pointer(UInt8)
+        force : Int
+        no_build : Int
+        no_deps : Int
+        no_lang : Int
+        short_circuit : Int
+        sign : Int
+        build_mode : UInt8
+        build_char : UInt8
+      {% else %}
+        pkg_flags : BuildPkgFlags
+        build_amount : BuildFlags
+        build_root : Pointer(UInt8)
+        cookie : Pointer(UInt8)
+      {% end %}
+      rootdir : Pointer(UInt8)
+    end
+
     alias Count = UInt32
     alias RPMFlags = UInt32
     alias TagVal = Int32
@@ -182,6 +207,7 @@ module RPM
     type SpecPkg = Pointer(Void)
     type SpecSrcIter = Pointer(Void)
     type SpecSrc = Pointer(Void)
+    type BuildArguments = Pointer(BuildArguments_s)
 
     alias RPMDs = DependencySet
     alias RPMPs = ProblemSet
@@ -196,6 +222,33 @@ module RPM
 
     enum RC
       OK, NOTFOUND, FAIL, NOTTRUSTED, NOKEY
+    end
+
+    enum QueryFlags : RPMFlags
+      FOR_DEFAULT   = 0
+      MD5           = (1_u32 << 0)
+      FILEDIGEST    = (1_u32 << 0)
+      SIZE          = (1_u32 << 1)
+      LINKTO        = (1_u32 << 2)
+      USER          = (1_u32 << 3)
+      GROUP         = (1_u32 << 4)
+      MTIME         = (1_u32 << 5)
+      MODE          = (1_u32 << 6)
+      RDEV          = (1_u32 << 7)
+      CONTEXTS      = (1_u32 << 15)
+      FILES         = (1_u32 << 16)
+      DEPS          = (1_u32 << 17)
+      SCRIPT        = (1_u32 << 18)
+      DIGEST        = (1_u32 << 19)
+      SIGNATURE     = (1_u32 << 20)
+      PATCHES       = (1_u32 << 21)
+      HDRCHK        = (1_u32 << 22)
+      FOR_LIST      = (1_u32 << 23)
+      FOR_STATE     = (1_u32 << 24)
+      FOR_DOCS      = (1_u32 << 25)
+      FOR_CONFIG    = (1_u32 << 26)
+      FOR_DUMPFILES = (1_u32 << 27)
+      FOR_LICENSE   = (1_u32 << 28)
     end
 
     # ## Callback APIs.
@@ -986,9 +1039,37 @@ module RPM
     fun rpmReadConfigFiles(UInt8*, UInt8*) : Int
 
     # ## Spec
+    @[Flags]
+    enum BuildPkgFlags : RPMFlags
+      NONE        = 0
+      NODIRTOKENS = (1_u32 << 0)
+    end
+
+    @[Flags]
+    enum BuildFlags : RPMFlags
+      NONE          = 0
+      PREP          = (1_u32 << 0)
+      BUILD         = (1_u32 << 1)
+      INSTALL       = (1_u32 << 2)
+      CHECK         = (1_u32 << 3)
+      CLEAN         = (1_u32 << 4)
+      FILECHECK     = (1_u32 << 5)
+      PACKAGESOURCE = (1_u32 << 6)
+      PACKAGEBINARY = (1_u32 << 7)
+      RMSOURCE      = (1_u32 << 8)
+      RMBUILD       = (1_u32 << 9)
+      STRINGBUF     = (1_u32 << 10)
+      RMSPEC        = (1_u32 << 11)
+      FILE_FILE     = (1_u32 << 16)
+      FILE_LIST     = (1_u32 << 17)
+      POLICY        = (1_u32 << 18)
+      NOBUILD       = (1_u32 << 31)
+    end
+
     # RPM 4.8 APIs.
     fun parseSpec(Transaction, UInt8*, UInt8*, UInt8*, Int, UInt8*, UInt8*, Int, Int) : Int
     fun rpmtsSpec(Transaction) : Spec
+    fun build(Transaction, UInt8*, BuildArguments, UInt8*) : Int
 
     # RPM 4.9 APIs.
     @[Flags]
@@ -1023,6 +1104,7 @@ module RPM
     fun rpmSpecSrcFlags(SpecSrc) : SourceFlags
     fun rpmSpecSrcNum(SpecSrc) : Int
     fun rpmSpecSrcFilename(SpecSrc) : Pointer(UInt8)
+    fun rpmSpecBuild(Spec, BuildArguments) : RC
   end # LibRPM
 
   # Exposed Types
