@@ -736,5 +736,11 @@ describe RPM::Spec do
       pkgs.any? { |x| x[RPM::Tag::Name] == "a" }.should be_true
       pkgs.any? { |x| x[RPM::Tag::Name] == "a-devel" }.should be_true
     end
+
+    it "#buildrequires" do
+      reqs = spec.buildrequires
+      reqs.any? { |x| x.name == "c" }.should be_true
+      reqs.any? { |x| x.name == "d" }.should be_true
+    end
   end
 end

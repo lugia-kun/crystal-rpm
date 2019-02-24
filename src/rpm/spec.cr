@@ -3,12 +3,14 @@ module RPM
     abstract def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
     abstract def buildroot : String
     abstract def packages : Array(RPM::Package)
+    abstract def buildrequires : Array(RPM::Require)
   end
 
   class Spec48 < SpecCommonBase
     getter ptr : LibRPM::Spec
     getter ts : LibRPM::Transaction
     @pkgs : Array(RPM::Package)? = nil
+    @buildreqs : Array(RPM::Require)? = nil
 
     def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
       ts = LibRPM.rpmtsCreate
@@ -37,9 +39,16 @@ module RPM
           pkgs = pkgs.value.next
         end
         @pkgs = arr
-      else
-        @pkgs.as(Array(RPM::Package))
       end
+      @pkgs.as(Array(RPM::Package))
+    end
+
+    def buildrequires
+      if @buildreqs.nil?
+        restrictions = RPM::Package.new(@ptr.value.build_restrictions)
+        @buildreqs = restrictions.requires
+      end
+      @buildreqs.as(Array(RPM::Require))
     end
 
     def finalize
@@ -51,6 +60,7 @@ module RPM
     getter ptr : LibRPM::Spec
     @hdr : Package? = nil
     @pkgs : Array(RPM::Package)? = nil
+    @buildreqs : Array(RPM::Require)? = nil
 
     class PackageIterator
       @iter : LibRPM::SpecPkgIter
@@ -115,6 +125,14 @@ module RPM
       else
         @pkgs.as(Array(RPM::Package))
       end
+    end
+
+    def buildrequires
+      if @buildreqs.nil?
+        hdr = header
+        @buildreqs = hdr.requires
+      end
+      @buildreqs.as(Array(RPM::Require))
     end
 
     def finalize
