@@ -1022,7 +1022,7 @@ module RPM
     fun rpmSpecSrcIterFree(SpecSrcIter) : SpecSrcIter
     fun rpmSpecSrcFlags(SpecSrc) : SourceFlags
     fun rpmSpecSrcNum(SpecSrc) : Int
-    fun rpmSpecSrcFileName(SpecSrc) : Pointer(UInt8)
+    fun rpmSpecSrcFilename(SpecSrc) : Pointer(UInt8)
   end # LibRPM
 
   # Exposed Types

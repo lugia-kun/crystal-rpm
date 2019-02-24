@@ -120,7 +120,7 @@ module RPM
             stop
           else
             make_source_instance(LibRPM.rpmSpecSrcFlags(src),
-                                 String.new(LibRPM.rpmSpecSrcFileName(src)),
+                                 String.new(LibRPM.rpmSpecSrcFilename(src)),
                                  LibRPM.rpmSpecSrcNum(src))
           end
         {% end %}
