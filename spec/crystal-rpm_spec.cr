@@ -716,6 +716,9 @@ describe RPM::Spec do
         RPM::LibRPM::Package_s.offsetof(@header).should eq(CCheck.offset_package_s("header"))
         RPM::LibRPM::Package_s.offsetof(@next).should eq(CCheck.offset_package_s("next"))
       end
+    else
+      pending "offsetof members in Package_s (compilation error)" do
+      end
     end
   {% end %}
 
@@ -737,10 +740,27 @@ describe RPM::Spec do
       pkgs.any? { |x| x[RPM::Tag::Name] == "a-devel" }.should be_true
     end
 
+    it "#sources" do
+      srcs = spec.sources
+      srcs.size.should eq(1)
+      src = srcs.find { |x| x.fullname == "a-1.0.tar.gz" }
+      src.class.should eq(RPM::Source)
+      if src
+        src.number.should eq(0)
+        src.no?.should be_false
+      end
+    end
+
     it "#buildrequires" do
       reqs = spec.buildrequires
       reqs.any? { |x| x.name == "c" }.should be_true
       reqs.any? { |x| x.name == "d" }.should be_true
+    end
+
+    it "#buildconflicts" do
+      cfts = spec.buildconflicts
+      cfts.any? { |x| x.name == "e" }.should be_true
+      cfts.any? { |x| x.name == "f" }.should be_true
     end
   end
 end

@@ -1016,6 +1016,13 @@ module RPM
     fun rpmSpecPkgFree(SpecPkgIter) : SpecPkgIter
     fun rpmSpecPkgIterFree(SpecPkgIter) : SpecPkgIter
     fun rpmSpecPkgHeader(SpecPkg) : Header
+    fun rpmSpecSrcIterInit(Spec) : SpecSrcIter
+    fun rpmSpecSrcIterNext(SpecSrcIter) : SpecSrc
+    fun rpmSpecSrcFree(SpecSrcIter) : SpecSrcIter
+    fun rpmSpecSrcIterFree(SpecSrcIter) : SpecSrcIter
+    fun rpmSpecSrcFlags(SpecSrc) : SourceFlags
+    fun rpmSpecSrcNum(SpecSrc) : Int
+    fun rpmSpecSrcFileName(SpecSrc) : Pointer(UInt8)
   end # LibRPM
 
   # Exposed Types

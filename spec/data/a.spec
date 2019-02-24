@@ -7,6 +7,7 @@ Url:            http://www.a.com
 Group:          Development
 Source:         a-1.0.tar.gz
 BuildRequires:  c d
+BuildConflicts: e f
 Provides:       something
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
