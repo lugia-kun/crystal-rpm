@@ -7,6 +7,7 @@
 
 #include <rpm/rpmcli.h>
 #include <rpm/rpmspec.h>
+#include <rpm/rpmbuild.h>
 
 #ifndef VERSION_MAJOR
 #define VERSION_MAJOR 9999
