@@ -211,6 +211,14 @@ module RPM
       header.conflicts
     end
 
+    def build(flags, test)
+      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        rc = LibRPM.buildSpec(@ptr, flags, test)
+      {% else %}
+
+      {% end %}
+    end
+
     # Cleanup
     def finalize
       {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}

@@ -21,6 +21,11 @@ module RPM
     end
 
     def finalize
+      if @db
+        db = @db.as(DB)
+        db.close
+        @db = nil
+      end
       LibRPM.rpmtsFree(@ptr) unless @ptr.null?
       @ptr = LibRPM::Transaction.null
     end
