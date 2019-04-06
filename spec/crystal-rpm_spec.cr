@@ -407,7 +407,14 @@ describe RPM::Transaction do
       a_installed_pkg = nil
       RPM.transaction do |ts|
         iter = ts.init_iterator
-        a_installed_pkg = iter.first
+        iter.each do |x|
+          if (has_files = x[RPM::Tag::BaseNames])
+            if has_files.is_a?(Array(String)) && has_files.size > 0
+              a_installed_pkg = x
+              break
+            end
+          end
+        end
       end
       dir = "/"
       if a_installed_pkg.nil?
@@ -419,11 +426,11 @@ describe RPM::Transaction do
       end
       # Uses an installed package as an example
       sample_pkg = a_installed_pkg.as(RPM::Package)
-      RPM.transaction(dir) do |ts|
+      describe "#version" do
         vers = sample_pkg[RPM::Tag::Version].as(String)
-        iter = ts.init_iterator
-        describe "#version" do
-          it "looks for packages whose version is \"#{vers}\"" do
+        it "looks for packages whose version is \"#{vers}\"" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator
             iter.version(RPM::Version.new(vers))
             iter.each do |sig|
               sig[RPM::Tag::Version].should eq(vers)
@@ -432,16 +439,35 @@ describe RPM::Transaction do
         end
       end
 
-      name = sample_pkg[RPM::Tag::Name].as(String)
-      patname = name[0..1]
-      pat = patname + "*"
-      RPM.transaction(dir) do |ts|
-        iter = ts.init_iterator
-        iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pat)
-        describe "#regexp" do
-          it "looks for packages whose name matches \"#{pat}\"" do
+      describe "#regexp" do
+        name = sample_pkg[RPM::Tag::Name].as(String)
+        patname = name[0..1]
+        pat = patname + "*"
+        it "looks for packages whose name matches \"#{pat}\"" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator
+            iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pat)
             iter.each do |pkg|
               pkg[RPM::Tag::Name].as(String).should start_with(patname)
+            end
+          end
+        end
+
+        # File name search test. (just an example)
+        files = sample_pkg.files
+        idx = Random.rand(files.size)
+        path = files[idx].path
+        it "looks for packages contains file \"#{path}\"" do
+          fn = File.basename(path)
+          dr = File.dirname(path)
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator
+            iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::DEFAULT, fn)
+            iter.regexp(RPM::DbiTag::DirNames, RPM::MireMode::DEFAULT, dr)
+            iter.each do |pkg|
+              pkg.files.any? do |file|
+                file.path == path
+              end.should be_true
             end
           end
         end

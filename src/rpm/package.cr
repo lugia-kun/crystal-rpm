@@ -89,7 +89,7 @@ module RPM
       basenames = basenames.as(Array(String))
       dirnames = self[Tag::DirNames].as(Array(String))
       diridxs = self[Tag::DirIndexes].as(Array(UInt32))
-      statelist = self[Tag::FileStates].as(Array(UInt32) | Nil)
+      statelist = self[Tag::FileStates].as(Array(UInt8) | Nil)
       flaglist = self[Tag::FileFlags].as(Array(UInt32) | Nil)
       sizelist = self[Tag::FileSizes].as(Array(UInt32))
       modelist = self[Tag::FileModes].as(Array(UInt16))
@@ -104,7 +104,7 @@ module RPM
         state = if statelist.nil?
                   FileState::NORMAL
                 else
-                  FileState.from_value(statelist.as(Array(UInt32))[i])
+                  FileState.from_value(statelist.as(Array(UInt8))[i])
                 end
         attr = if flaglist.nil?
                  FileAttrs::NONE
