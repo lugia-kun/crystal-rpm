@@ -143,6 +143,50 @@ describe RPM::File do
   end
 end
 
+describe RPM::TagData do
+  describe "#create" do
+    it "creates string data" do
+      data = RPM::TagData.create("foo", RPM::Tag::Name)
+      data.value_no_array.should eq("foo")
+      expect_raises(TypeCastError) do
+        data.value_array
+      end
+      data.value.should eq("foo")
+    end
+
+    it "creates array string data" do
+      data = RPM::TagData.create(["foo", "bar", "baz"], RPM::Tag::BaseNames)
+      data.size.should eq(3)
+      data.value_array.should eq(["foo", "bar", "baz"])
+      data.value.should eq(["foo", "bar", "baz"])
+    end
+
+    it "creates integer data" do
+      expect_raises(TypeCastError) do
+        RPM::TagData.create([1_u8], RPM::Tag::DirIndexes)
+      end
+      data = RPM::TagData.create([1_u32, 2_u32], RPM::Tag::DirIndexes)
+      data.size.should eq(2)
+      expect_raises(TypeCastError) do
+        data.value_no_array
+      end
+      data.value_array.should eq(Slice[1_u32, 2_u32])
+      data.value.should eq(Slice[1_u32, 2_u32])
+    end
+
+    it "creates binary data" do
+      slice = Array(UInt8).build(16) do |x|
+        (1..16).each do |m|
+          x[m] = m.to_u8
+        end
+        16
+      end
+      data = RPM::TagData.create(slice, RPM::Tag::SigMD5)
+      data.value.should eq(Bytes[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    end
+  end
+end
+
 describe RPM::Package do
   pkg = RPM::Package.create("foo", RPM::Version.new("1.0"))
   describe "created package #{pkg}" do
@@ -165,6 +209,16 @@ describe RPM::Package do
 
     it "has a known signature" do
       pkg.signature.should eq("3b5f9d468c877166532c662e29f43bc3")
+    end
+
+    it "can provide TagData" do
+      tag = RPM::TagData.for(pkg.hdr, RPM::Tag::Arch)
+      tag.size.should eq(1)
+      tag[0].should eq("i586")
+
+      tag = RPM::TagData.for(pkg, RPM::Tag::Name)
+      tag.size.should eq(1)
+      tag[0].should eq("simple")
     end
 
     it "has a name 'simple'" do

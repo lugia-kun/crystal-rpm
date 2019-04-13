@@ -925,6 +925,8 @@ module RPM
     fun rpmtdCount(TagData) : UInt32
     fun rpmtdTag(TagData) : TagVal
     fun rpmtdType(TagData) : TagType
+    fun rpmtdSetIndex(TagData, Int) : Int
+    fun rpmtdGetIndex(TagData, Int) : Int
 
     fun rpmtdInit(TagData) : LibC::Int
     fun rpmtdNext(TagData) : LibC::Int
