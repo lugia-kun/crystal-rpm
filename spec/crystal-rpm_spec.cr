@@ -152,6 +152,8 @@ describe RPM::TagData do
         data.value_array
       end
       data.value.should eq("foo")
+      data.base64.should eq("(not a blob)")
+      data.to_s.should eq("foo")
     end
 
     it "creates array string data" do
@@ -159,6 +161,8 @@ describe RPM::TagData do
       data.size.should eq(3)
       data.value_array.should eq(["foo", "bar", "baz"])
       data.value.should eq(["foo", "bar", "baz"])
+      data.base64.should eq("(not a blob)")
+      data.to_s.should eq(%(["foo", "bar", "baz"]))
     end
 
     it "creates integer data" do
@@ -172,6 +176,8 @@ describe RPM::TagData do
       end
       data.value_array.should eq(Slice[1_u32, 2_u32])
       data.value.should eq(Slice[1_u32, 2_u32])
+      data.base64.should eq("(not a blob)")
+      data.to_s.should eq(%(["1", "2"]))
     end
 
     it "creates binary data" do
@@ -183,6 +189,8 @@ describe RPM::TagData do
       end
       data = RPM::TagData.create(slice, RPM::Tag::SigMD5)
       data.value.should eq(Bytes[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+      data.base64.should eq("AAECAwQFBgcICQoLDA0ODw==\n")
+      data.to_s.should eq("000102030405060708090a0b0c0d0e0f")
     end
   end
 end

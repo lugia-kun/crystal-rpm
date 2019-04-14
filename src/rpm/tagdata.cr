@@ -205,11 +205,8 @@ module RPM
       is_array?(type, count, ret_type)
     end
 
-    private def get_binary(count)
-      s = LibRPM.rpmtdFormat(@ptr, LibRPM::TagDataFormat::BASE64, nil)
-      str = String.new(s)
-      LibC.free(s)
-      Base64.decode(str)
+    private def get_binary
+      Base64.decode(self.base64)
     end
 
     def value_no_array
@@ -223,7 +220,7 @@ module RPM
 
       # BIN is stored in array of UInt8. Treating specially
       if type == TagType::BIN
-        return get_binary(count)
+        return get_binary
       end
 
       if is_array?(type, count, ret_type)
@@ -240,6 +237,73 @@ module RPM
       nil
     end
 
+    def base64
+      format(LibRPM::TagDataFormat::BASE64)
+    end
+
+    def to_s(io : IO)
+      io << to_s
+    end
+
+    def to_s(io)
+      format(io, LibRPM::TagDataFormat::STRING)
+    end
+
+    def to_s
+      format(LibRPM::TagDataFormat::STRING)
+    end
+
+    def format(io : IO, fmt : LibRPM::TagDataFormat) : Void
+      count = self.size
+      if count < 1
+        io << "(Empty RPM::TagData)"
+      elsif count > 1
+        self.pos = 0
+        zero = format1(fmt)
+        if zero == "(not a blob)"
+          io << zero
+        else
+          io << "[\"" << zero << "\""
+          (1...count).each do |i|
+            self.pos = i
+            io << ", \"" << format1(fmt) << "\""
+          end
+          io << "]"
+        end
+      else
+        self.pos = 0
+        io << format1(fmt)
+      end
+    end
+
+    def format(fmt : LibRPM::TagDataFormat) : String
+      count = self.size
+      if count <= 1
+        if count == 1
+          self.pos = 0
+          format1(fmt)
+        else
+          "(Empty RPM::TagData)"
+        end
+      else
+        String.build do |io|
+          format(io, fmt)
+        end
+      end
+    end
+
+    def format1(fmt : LibRPM::TagDataFormat)
+      s = LibRPM.rpmtdFormat(@ptr, fmt, nil)
+      if s.null?
+        raise NilAssertionError.new("rpmtdFormat returned NULL")
+      end
+      begin
+        String.new(s)
+      ensure
+        LibC.free(s)
+      end
+    end
+
     def value_array
       type = self.type
       count = self.size
@@ -251,7 +315,7 @@ module RPM
 
       # BIN is stored in array of UInt8. Treating specially
       if type == TagType::BIN
-        return get_binary(count)
+        return get_binary
       end
 
       if !is_array?(type, count, ret_type)
