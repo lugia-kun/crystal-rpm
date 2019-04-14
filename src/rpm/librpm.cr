@@ -302,7 +302,7 @@ module RPM
     fun rpmdbInitIterator(RPMDb, DbiTagVal, Void*, SizeT) : RPMDbMatchIterator
 
     fun rpmdbNextIterator(RPMDbMatchIterator) : Header
-    fun rpmdbFreeIterator(RPMDbMatchIterator) : Void
+    fun rpmdbFreeIterator(RPMDbMatchIterator) : RPMDbMatchIterator
 
     # ## Dependency Set APIs.
 

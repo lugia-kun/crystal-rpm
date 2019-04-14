@@ -2,11 +2,13 @@ module RPM
   class MatchIterator
     include Enumerable(RPM::Package)
 
-    def initialize(@ptr : LibRPM::DatabaseMatchIterator)
+    @ptr : LibRPM::DatabaseMatchIterator
+
+    def initialize(@ptr)
     end
 
     def finalize
-      LibRPM.rpmdbFreeIterator(@ptr)
+      @ptr = LibRPM.rpmdbFreeIterator(@ptr)
     end
 
     def each
