@@ -29,4 +29,4 @@ before_install:
   - docker build -t $RPMVERSION --target=$RPMVERSION -f .travis/Dockerfile.$RPMVERSION .
 
 script:
-  - docker run -v $(pwd):/work -w /work $RPMVERSION crystal spec -d
+  - docker run -v $(pwd):/work -w /work $RPMVERSION crystal spec
