@@ -31,11 +31,17 @@ module RPM
       @e, @v, @r = Version.parse_evr(str)
     end
 
-    def initialize(str : String, @e : Int32)
+    def initialize(str : String, epoch : Int)
       e, @v, @r = Version.parse_evr(str)
+      @e = epoch.to_i32
     end
 
-    def initialize(@v : String, @r : String, @e : Int32? = nil)
+    def initialize(@v : String, @r : String, epoch : Int? = nil)
+      if epoch
+        @e = epoch.to_i32
+      else
+        @e = nil
+      end
     end
 
     def <=>(other : Version)
