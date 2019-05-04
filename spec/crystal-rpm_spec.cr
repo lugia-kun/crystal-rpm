@@ -443,15 +443,73 @@ describe RPM::Transaction do
     end
 
     describe "Test iterator" do
-      RPM.transaction do |ts|
-        describe "#init_iterator" do
+      a_installed_pkg = nil
+      dir = tmproot
+
+      describe "#init_iterator" do
+        RPM.transaction do |ts|
           iter = ts.init_iterator
           it "returns MatchIterator" do
             iter.class.should eq(RPM::MatchIterator)
           end
         end
 
-        describe "#db" do
+        # Base test
+        it "looks for a package" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator
+            a_installed_pkg = iter.first?
+            a_installed_pkg.should_not be_nil
+          end
+        end
+
+        it "looks for a package contains a file" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator
+            iter.each do |x|
+              if (has_files = x[RPM::Tag::BaseNames]).is_a?(Array(String))
+                if has_files.size > 0
+                  a_installed_pkg = x
+                  break
+                end
+              end
+            end
+          end
+        end
+
+        # File name search test. (just an example)
+        it "looks for packages contains a file" do
+          files = a_installed_pkg.as(RPM::Package).files
+          idx = Random.rand(files.size)
+          path = files[idx].path
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator(RPM::DbiTag::BaseNames, path)
+            n = 0
+            iter.each do |pkg|
+              pkg.files.any? { |file| file.path == path }.should be_true
+              n += 1
+            end
+            n.should be > 0
+          end
+        end
+
+        it "looks for package not found (by searching package '......')" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator(RPM::DbiTag::Name, "......")
+            iter.to_a.should eq([] of RPM::Package)
+          end
+        end
+
+        it "looks for package not found (by searching filename '/tmp/foo')" do
+          RPM.transaction(dir) do |ts|
+            iter = ts.init_iterator(RPM::DbiTag::BaseNames, "/tmp/foo")
+            iter.to_a.should eq([] of RPM::Package)
+          end
+        end
+      end
+
+      describe "#db" do
+        RPM.transaction do |ts|
           db = nil
           it "opens db" do
             db = ts.db
@@ -460,77 +518,60 @@ describe RPM::Transaction do
 
           it "can generate iterator" do
             iter = db.as(RPM::DB).init_iterator(RPM::DbiTag::Name)
-            a_installed_pkg = iter.first
-            a_installed_pkg.should_not be_nil
+            a_pkg = iter.first
+            a_pkg.should_not be_nil
           end
         end
       end
 
-      a_installed_pkg = nil
-      RPM.transaction do |ts|
-        iter = ts.init_iterator
-        iter.each do |x|
-          if (has_files = x[RPM::Tag::BaseNames])
-            if has_files.is_a?(Array(String)) && has_files.size > 0
-              a_installed_pkg = x
-              break
-            end
-          end
-        end
-      end
-      dir = "/"
-      if a_installed_pkg.nil?
-        dir = tmproot
-        RPM.transaction(dir) do |ts|
-          iter = ts.init_iterator
-          a_installed_pkg = iter.first
-        end
-      end
-      # Uses an installed package as an example
-      sample_pkg = a_installed_pkg.as(RPM::Package)
       describe "#version" do
-        vers = sample_pkg[RPM::Tag::Version].as(String)
+        pkg = a_installed_pkg.as(RPM::Package)
+        vers = pkg[RPM::Tag::Version].as(String)
         it "looks for packages whose version is \"#{vers}\"" do
           RPM.transaction(dir) do |ts|
             iter = ts.init_iterator
             iter.version(RPM::Version.new(vers))
+            n = 0
             iter.each do |sig|
+              n += 1
               sig[RPM::Tag::Version].should eq(vers)
             end
+            n.should be > 0
           end
         end
       end
 
       describe "#regexp" do
-        name = sample_pkg[RPM::Tag::Name].as(String)
+        pkg = a_installed_pkg.as(RPM::Package)
+        name = pkg[RPM::Tag::Name].as(String)
         patname = name[0..1]
         pat = patname + "*"
         it "looks for packages whose name matches \"#{pat}\"" do
           RPM.transaction(dir) do |ts|
             iter = ts.init_iterator
             iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pat)
+            n = 0
             iter.each do |pkg|
+              n += 1
               pkg[RPM::Tag::Name].as(String).should start_with(patname)
             end
+            n.should be > 0
           end
         end
 
-        # File name search test. (just an example)
-        files = sample_pkg.files
+        files = pkg.files
         idx = Random.rand(files.size)
-        path = files[idx].path
-        it "looks for packages contains file \"#{path}\"" do
-          fn = File.basename(path)
-          dr = File.dirname(path)
+        basename = File.basename(files[idx].path)
+        it "looks for packages which contain a file whose basename is \"#{basename}\"" do
           RPM.transaction(dir) do |ts|
             iter = ts.init_iterator
-            iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::DEFAULT, fn)
-            iter.regexp(RPM::DbiTag::DirNames, RPM::MireMode::DEFAULT, dr)
+            iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, basename)
+            n = 0
             iter.each do |pkg|
-              pkg.files.any? do |file|
-                file.path == path
-              end.should be_true
+              n += 1
+              pkg.files.any? { |x| File.basename(x.path) == basename }.should be_true
             end
+            n.should be > 0
           end
         end
       end
@@ -580,8 +621,7 @@ describe RPM::Transaction do
       # others. This must be investigated...
       pending "#remove-ed properly" do
         RPM.transaction(tmproot) do |ts|
-          iter = ts.init_iterator
-          iter.regexp(RPM::DbiTag::Name, RPM::MireMode::DEFAULT, "simple")
+          iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
           removed = [] of RPM::Package
           iter.each do |pkg|
             if pkg[RPM::Tag::Version].as(String) == "1.0" &&

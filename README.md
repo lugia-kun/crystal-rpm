@@ -61,12 +61,20 @@ end
 ```crystal
 # with given name
 RPM.transaction do |ts|
+  iter - ts.init_iterator(RPM::DbiTag::Name, "package-name-to-find")
+  iter.each do |pkg|
+    # Iterator over matching packages.
+  end
+end
+
+# with given regexp
+RPM.transaction do |ts|
   iter = ts.init_iterator   # Create iterator of installed packages
   
   # Set condition
   iter.regexp(RPM::DbiTag::Name, # <= Entry to search (here, Name)
-              RPM::MireMode::DEFAULT, # <= Default matching method
-              "simple") #  <= Name to search
+              RPM::MireMode::REGEX, # <= Default matching method
+              "simple.*") #  <= Name to search
 
   # Iterate over matching packages.
   iter.each do |pkg|
@@ -79,6 +87,24 @@ RPM.transaction do |ts|
   iter = ts.init_iterator
   iter.each do |pkg|
     # ... iterates over all installed packages.
+  end
+end
+
+# Lookup package(s) which contains a specific file
+RPM.transaction do |ts|
+  iter = ts.init_iterator(RPM::DbiTag::BaseNames, "/path/to/lookup")
+  iter.each do |pkg|
+    # ... iterates over packages contains "/path/to/lookup"
+  end
+end
+
+# NOTE: Using regexp with BaseNames, it will search packages which
+# contain a file whose basename is the given name.
+RPM.transaction do |ts|
+  iter = ts.init_iterator
+  iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, "README")
+  iter.each do |pkg|
+    # ... iterates over packages which contain a file named "README"
   end
 end
 ```

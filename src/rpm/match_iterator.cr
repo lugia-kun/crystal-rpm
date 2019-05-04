@@ -18,16 +18,24 @@ module RPM
     end
 
     def next_iterator
-      pkg_ptr = LibRPM.rpmdbNextIterator(@ptr)
-      if !pkg_ptr.null?
-        RPM::Package.new(pkg_ptr)
-      else
+      if @ptr.null?
         nil
+      else
+        pkg_ptr = LibRPM.rpmdbNextIterator(@ptr)
+        if !pkg_ptr.null?
+          RPM::Package.new(pkg_ptr)
+        else
+          nil
+        end
       end
     end
 
     def offset
-      LibRPM.rpmdbGetIteratorOffset(@ptr)
+      if @ptr.null?
+        0
+      else
+        LibRPM.rpmdbGetIteratorOffset(@ptr)
+      end
     end
 
     def set_iterator_re(tag : DbiTag | DbiTagValue, mode : MireMode, string : String)

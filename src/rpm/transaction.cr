@@ -48,10 +48,9 @@ module RPM
       else
         it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, nil, 0)
       end
-      if it_ptr.null?
-        raise Exception.new("Can't init iterator for [#{tag}] -> '#{val}'")
-      end
-
+      # Here, they'll return NULL if nothing is found. So we should
+      # safely wrap NULL pointers into MatchIterator for handling not
+      # found.
       MatchIterator.new(it_ptr)
     end
 
