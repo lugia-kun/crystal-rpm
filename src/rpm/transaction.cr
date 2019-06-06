@@ -5,29 +5,26 @@ module RPM
   class Transaction
     getter ptr : LibRPM::Transaction
     @db : DB? = nil
+    @keys : Set(String) = Set(String).new
 
-    def initialize(**opts)
-      @keys = Set(String).new
-
-      root = opts[:root]?
-      root ||= "/"
-
+    def initialize(*, root : String = "/")
       @ptr = LibRPM.rpmtsCreate
       if @ptr.null?
         raise Exception.new("Can't create Transaction")
       end
-
+      @ptr = ptr
       LibRPM.rpmtsSetRootDir(@ptr, root)
     end
 
     def finalize
-      if @db
-        db = @db.as(DB)
-        db.close
-        @db = nil
+      if (ptr = @ptr)
+        if (db = @db)
+          db.close
+        else
+          LibRPM.rpmtsCloseDB(ptr)
+        end
+        @ptr = LibRPM.rpmtsFree(ptr)
       end
-      LibRPM.rpmtsFree(@ptr) unless @ptr.null?
-      @ptr = LibRPM::Transaction.null
     end
 
     def init_iterator
@@ -247,11 +244,11 @@ module RPM
 
   def self.transaction(root = "/", &block)
     ts = Transaction.new
-    ts.root_dir = root
-    yield ts
-  ensure
-    unless ts.nil?
-      ts.as(Transaction).finalize
+    begin
+      ts.root_dir = root
+      yield ts
+    ensure
+      ts.finalize
     end
   end
 end
