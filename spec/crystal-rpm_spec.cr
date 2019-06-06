@@ -396,6 +396,11 @@ describe RPM::Problem do
     it "has same description" do
       problem2.to_s.should eq(problem.to_s)
     end
+
+    it "can duplicate" do
+      d = problem2.dup
+      d.key.should eq(problem.key)
+    end
   end
 end
 

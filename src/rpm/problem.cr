@@ -56,14 +56,16 @@ module RPM
   # No translation applies for VERIFY.
   #
   class Problem
-    @pset : ProblemSet?
+    @need_gc : Bool = true
     property ptr : LibRPM::Problem
 
     def finalize
-      LibRPM.rpmProblemFree(@ptr) unless @ptr.null?
+      if @need_gc
+        @ptr = LibRPM.rpmProblemFree(@ptr)
+      end
     end
 
-    def initialize(@ptr, @pset = nil)
+    def initialize(@ptr, *, @need_gc = false)
     end
 
     def initialize(type, pkg_nevr, key, alt_nevr, str, number)
@@ -76,6 +78,12 @@ module RPM
       ptr = RPM.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
       raise Exception.new("Cannot create RPM problem") if ptr.null?
       @ptr = ptr
+    end
+
+    def dup
+      nptr = LibRPM.rpmProblemLink(@ptr)
+      raise Exception.new("Cannot duplicate RPM problem") if nptr.null?
+      Problem.new(nptr, need_gc: true)
     end
 
     def type
@@ -124,12 +132,12 @@ module RPM
       if LibRPM.rpmpsNextIterator(@iter) < 0
         stop
       else
-        Problem.new(LibRPM.rpmpsGetProblem(@iter), @pset)
+        Problem.new(LibRPM.rpmpsGetProblem(@iter))
       end
     end
 
     def finalize
-      LibRPM.rpmpsFreeIterator(@iter)
+      @iter = LibRPM.rpmpsFreeIterator(@iter)
     end
   end
 
@@ -157,7 +165,9 @@ module RPM
     end
 
     def finalize
-      LibRPM.rpmpsFree(@ptr) unless @ptr.null?
+      unless @ptr.null?
+        @ptr = LibRPM.rpmpsFree(@ptr)
+      end
     end
   end
 end
