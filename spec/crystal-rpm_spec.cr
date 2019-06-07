@@ -435,12 +435,8 @@ describe RPM::Transaction do
       pkg = RPM::Package.open(path)
       it "#install-ed \"#{pkg[RPM::Tag::Name]}\"" do
         RPM.transaction(tmproot) do |ts|
-          begin
-            ts.install(pkg, path)
-            ts.commit
-          ensure
-            ts.db.close
-          end
+          ts.install(pkg, path)
+          ts.commit
         end
         test_path = File.join(tmproot, "usr/share/simple/README")
         File.exists?(test_path).should be_true
@@ -582,35 +578,45 @@ describe RPM::Transaction do
       end
     end
 
-    describe "Test problem and callback" do
+    describe "Test callback" do
       path = fixture("simple-1.0-0.i586.rpm")
       pkg = RPM::Package.open(path)
       RPM.transaction(tmproot) do |ts|
-        begin
-          ts.install(pkg, path)
-          types = [] of RPM::CallbackType
-          ts.commit do |pkg, type|
-            it "runs expectations in the block" do
-              case type
-              when RPM::CallbackType::TRANS_PROGRESS,
-                   RPM::CallbackType::TRANS_START,
-                   RPM::CallbackType::TRANS_STOP
-                pkg.should be_nil
-              else
-                # other values are ignored.
-              end
+        ts.install(pkg, path)
+        types = [] of RPM::CallbackType
+        ts.commit do |pkg, type|
+          it "runs expectations in the block" do
+            case type
+            when RPM::CallbackType::TRANS_PROGRESS,
+                 RPM::CallbackType::TRANS_START,
+                 RPM::CallbackType::TRANS_STOP
+              pkg.should be_nil
+            else
+              # other values are ignored.
             end
-            types << type
-            nil
           end
-          it "collects transaction callback types" do
-            types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
-                                     RPM::CallbackType::TRANS_PROGRESS,
-                                     RPM::CallbackType::TRANS_STOP])
-          end
-        ensure
-          ts.db.close
+          types << type
+          nil
         end
+        it "collects transaction callback types" do
+          types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
+                                   RPM::CallbackType::TRANS_PROGRESS,
+                                   RPM::CallbackType::TRANS_STOP])
+        end
+      end
+    end
+
+    describe "Test problem" do
+      path = fixture("simple-1.0-0.i586.rpm")
+      pkg = RPM::Package.open(path)
+      RPM.transaction(tmproot) do |ts|
+        ts.install(pkg, path)
+        ts.order
+        ts.clean
+        it "rejects installation" do
+          ts.commit.should_not eq(0)
+        end
+
         it "collects problems" do
           probs = RPM::ProblemSet.new(ts)
           prob = probs.each.find do |prob|
@@ -638,22 +644,18 @@ describe RPM::Transaction do
           end
           raise Exception.new("No packages found to remove!") if removed.empty?
 
-          begin
-            ts.order
+          ts.order
 
-            probs = ts.check
-            bad = false
-            probs.each do |prob|
-              bad = true
-              STDERR.puts prob.to_s
-            end
-            raise Exception.new("Transaction has problem") if bad
-
-            ts.clean
-            ts.commit
-          ensure
-            ts.db.close
+          probs = ts.check
+          bad = false
+          probs.each do |prob|
+            bad = true
+            STDERR.puts prob.to_s
           end
+          raise Exception.new("Transaction has problem") if bad
+
+          ts.clean
+          ts.commit
         end
         test_path = File.join(tmproot, "usr/share/simple/README")
         File.exists?(test_path).should be_false

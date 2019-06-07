@@ -25,6 +25,7 @@ module RPM
         end
         @ptr = LibRPM.rpmtsFree(ptr)
       end
+      @db = nil
     end
 
     def init_iterator
@@ -135,6 +136,14 @@ module RPM
     def db
       @db ||= DB.new(self)
       @db.as(DB)
+    end
+
+    def close_db
+      @db = nil
+      LibRPM.rpmtsCloseDB(@ptr)
+      if !LibRPM.rpmtsGetRdb(@ptr).null?
+        raise "Database were not closed properly"
+      end
     end
 
     def install_element(pkg : Package, key : String, **opts)
@@ -248,7 +257,7 @@ module RPM
       ts.root_dir = root
       yield ts
     ensure
-      ts.finalize
+      ts.close_db
     end
   end
 end
