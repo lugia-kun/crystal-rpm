@@ -919,3 +919,35 @@ describe RPM::Spec do
     end
   end
 end
+
+describe "Files" do
+  pending "should not be opened" do
+    pid = Process.pid
+    path = "/proc/#{pid}/fd"
+    dbpath = RPM["_dbpath"]
+    system("ls", ["-l", path])
+    Dir.open(path) do |dir|
+      dir.each do |x|
+        fp = File.join(path, x)
+        begin
+          info = File.info(fp, follow_symlinks: false)
+          next unless info.symlink?
+          tg = File.real_path(fp)
+        rescue e : Errno
+          STDERR.puts e.to_s
+          STDERR.flush
+          next
+        end
+        if tg.starts_with?(dbpath)
+          raise "All DB should be closed: '#{tg}' is opened."
+        end
+      end
+    end
+  rescue e : Errno
+    if e.errno != Errno::ENOENT
+      raise e
+    else
+      STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
+    end
+  end
+end
