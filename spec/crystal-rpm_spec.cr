@@ -509,22 +509,6 @@ describe RPM::Transaction do
         end
       end
 
-      describe "#db" do
-        RPM.transaction do |ts|
-          db = nil
-          it "opens db" do
-            db = ts.db
-            db.should be_a(RPM::DB)
-          end
-
-          it "can generate iterator" do
-            iter = db.as(RPM::DB).init_iterator(RPM::DbiTag::Name)
-            a_pkg = iter.first
-            a_pkg.should_not be_nil
-          end
-        end
-      end
-
       describe "#version" do
         pkg = a_installed_pkg.as(RPM::Package)
         vers = pkg[RPM::Tag::Version].as(String)

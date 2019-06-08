@@ -47,12 +47,9 @@ pkg.obsoletes # => Array of Obsolstes.
 RPM.transaction do |ts|
   path = "pkg_to_install-1.0-0.x86_64.rpm"
   pkg = RPM::Package.open(path)
-  begin
-    ts.install(pkg, path) # Add installation package. Package path is required.
-    ts.commit   # Run Transaction
-  ensure
-    ts.db.close # must close Database.
-  end
+  
+  ts.install(pkg, path) # Add installation package. Package path is required.
+  ts.commit   # Run Transaction
 end
 ```
 
@@ -116,14 +113,10 @@ OpenSUSE (see #1).
 
 ```crystal
 RPM.transaction do |ts|
-  begin
-    ts.delete(pkg) # Add to removal package
-    ts.order
-    ts.clean
-    ts.commit   # Run Transaction
-  ensure
-    ts.db.close # must close Database.
-  end
+  ts.delete(pkg) # Add to removal package
+  ts.order
+  ts.clean
+  ts.commit   # Run Transaction
 end
 ```
 
@@ -138,7 +131,7 @@ begin
   ts.clean
   ts.commit
 ensure
-  ts.db.close
+  ts.close_db # Must close DB
 end
 ts.finalize # Not nesseary, but recommended.
 ```
@@ -169,7 +162,7 @@ packages[1][RPM::Tag::Name] # => (Name of the second package)
 spec.buildrequires # => Array of BuildRequires.
 ```
 
-### Build RPM
+### Build RPM (not yet available)
 
 ```crystal
 spec = RPM::Spec.open("foo.spec")

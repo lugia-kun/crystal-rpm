@@ -1,12 +1,14 @@
 module RPM
-  class DB
-  end
-
+  # Handles RPM transaction. Any RPM Database work must be accessed
+  # via the Transaction.
   class Transaction
     getter ptr : LibRPM::Transaction
-    @db : DB? = nil
     @keys : Set(String) = Set(String).new
 
+    # Initialize a new transaction object.
+    #
+    # You must close the DB with `#close_db` after use.
+    # Recommended to use `RPM.transaction` instead.
     def initialize(*, root : String = "/")
       @ptr = LibRPM.rpmtsCreate
       if @ptr.null?
@@ -17,22 +19,15 @@ module RPM
     end
 
     def finalize
-      if (ptr = @ptr)
-        if (db = @db)
-          db.close
-        else
-          LibRPM.rpmtsCloseDB(ptr)
-        end
-        @ptr = LibRPM.rpmtsFree(ptr)
-      end
-      @db = nil
+      close_db
+      @ptr = LibRPM.rpmtsFree(@ptr)
     end
 
-    def init_iterator
-      # Value of 0 is not like "None".
-      init_iterator(DbiTag::Packages, nil)
-    end
-
+    # Run transaction check
+    #
+    # Returns a ProblemSet with found problem.
+    #
+    # Raises exception if check errored.
     def check
       rc = LibRPM.rpmtsCheck(@ptr)
       raise Exception.new("RPM: Failed to check transaction") if rc != 0
@@ -40,7 +35,20 @@ module RPM
       ProblemSet.new(self)
     end
 
-    def init_iterator(tag : DbiTag | DbiTagValue, val : String | Slice(UInt8) | Nil = nil)
+    # Create a new package iterator with given `tag` and `val`
+    #
+    # Please refer RPM's `rpmtsInitIterator()` function for more
+    # details.
+    #
+    # Some examples are:
+    #
+    #  * For package tag lookup, use `RPM::DbiTag::Packages`.
+    #  * For package name lookup, use `RPM::DbiTag::Name`.
+    #  * For filename (fullpath) lookup, use `RPM::DbiTag::BaseNames`.
+    #  * To lookup by a specific tag, initialize iterator with
+    #    `RPM::DbiTag::Packages`, and use `#regexp` method.
+    def init_iterator(tag : DbiTag | DbiTagValue = DbiTag::Packages,
+                      val : String | Slice(UInt8) | Nil = nil)
       if val
         it_ptr = LibRPM.rpmtsInitIterator(@ptr, tag, val, val.size)
       else
@@ -52,27 +60,35 @@ module RPM
       MatchIterator.new(it_ptr)
     end
 
-    def each_match(key, val)
-      self.db.init_iterator(key, val)
-    end
-
+    # Iterate over packages of matching key and value.
     def each_match(key, val, &block)
-      itr = self.db.init_iterator(key, val)
+      itr = init_iterator(key, val)
       itr.each(&block)
     end
 
+    # Iterate over all packages.
     def each(&block)
-      each_match(0, nil, &block)
+      each_match(DbiTag::Packages, nil, &block)
     end
 
+    # Register a package to be installed
+    #
+    # `key` should (must?) be the path of the source package.
     def install(pkg : Package, key : String)
       install_element(pkg, key, upgrade: false)
     end
 
+    # Register a package to be upgraded
+    #
+    # `key` should (must?) be the path of the source package.
     def upgrade(pkg : Package, key : String)
       install_element(pkg, key, upgrade: true)
     end
 
+    # Register all matching packages to be deleted.
+    #
+    # Note: No package will be rejected (even RPM itself). Exception
+    # will be raised when some error occured.
     def delete_by_iterator(iter : MatchIterator)
       iter.each do |header|
         ret = LibRPM.rpmtsAddEraseElement(@ptr, header.hdr, iter.offset)
@@ -80,25 +96,29 @@ module RPM
       end
     end
 
+    # Register given package to be deleted.
     def delete(pkg : Package)
-      sigmd5 = pkg[DbiTag::SigMD5]
-      if !sigmd5.as(Slice(UInt8)).empty?
-        iter = each_match(DbiTag::SigMD5, sigmd5.as(Slice(UInt8)))
+      sigmd5 = pkg[DbiTag::SigMD5].as(Slice(UInt8))
+      if !sigmd5.empty?
+        iter = init_iterator(DbiTag::SigMD5, sigmd5)
       else
         labl = pkg[DbiTag::Label].as(String)
-        iter = each_match(DbiTag::Label, labl)
+        iter = init_iterator(DbiTag::Label, labl)
       end
 
       delete_by_iterator(iter)
     end
 
+    # Register given package to be deleted (by a name)
     def delete(pkg : String)
-      iter = each_match(DbiTag::Label, pkg)
+      iter = init_iterator(DbiTag::Label, pkg)
       delete_by_iterator(iter)
     end
 
+    # Register given dependency to be deleted
     def delete(pkg : Dependency)
-      iter = each_match(DbiTag::Label, pkg.name).set_iterator_version(pkg.version)
+      iter = init_iterator(DbiTag::Label, pkg.name)
+      iter.set_iterator_version(pkg.version)
       delete_by_iterator(iter)
     end
 
@@ -117,41 +137,46 @@ module RPM
       LibRPM.rpmtsClean(@ptr)
     end
 
+    # Sets rootdir
+    #
+    # This is possible only while no iterators are bound and no
+    # installations and/or deletions are set.
     def root_dir=(dir : String | UInt8*)
       LibRPM.rpmtsSetRootDir(@ptr, dir)
     end
 
+    # Gets rootdir
+    #
+    # Optimization NOTE: The rootdir will not be cached. Each time
+    # this method is called, this method allocates a new memory space
+    # to store the rootdir pathname, and return it.
     def root_dir
       String.new(LibRPM.rpmtsRootDir(@ptr))
     end
 
+    # Set transaction flags
     def flags=(flg)
       LibRPM.rpmtsSetFlags(@ptr, flg)
     end
 
+    # Get transaction flags
     def flags
       LibRPM.rpmtsFlags(@ptr)
     end
 
-    def db
-      @db ||= DB.new(self)
-      @db.as(DB)
-    end
-
+    # Closes the opened DB handle
     def close_db
-      @db = nil
       LibRPM.rpmtsCloseDB(@ptr)
       if !LibRPM.rpmtsGetRdb(@ptr).null?
         raise "Database were not closed properly"
       end
     end
 
-    def install_element(pkg : Package, key : String, **opts)
+    # Base method of install, upgrade and delete
+    def install_element(pkg : Package, key : String,
+                        *, upgrade : Bool = false)
       raise Exception.new("#{self}: key #{key} must be unique") if @keys.includes?(key)
       @keys << key
-
-      upgrade = opts[:upgrade]?
-      upgrade ||= false
 
       ret = LibRPM.rpmtsAddInstallElement(@ptr, pkg.hdr, key, upgrade, nil)
       raise Exception.new("Failed add install element") if ret != 0
@@ -171,6 +196,21 @@ module RPM
       end
     end
 
+    # Sets the callback method (for running under running
+    # transaction), and yields the given block. Callback is set only
+    # while the block is yielded.
+    #
+    # For user-friendly way to apply callback, use following form
+    # instead:
+    # ```crystal
+    #  ts.commit do |header, type, amount, total, key|
+    #    # do something here.
+    #  end
+    # ```
+    #
+    # NOTE: We notifies `rpmtsRun` (`#commit`) may raises an Exception
+    # to the compiler, but raising an exception is highly discouraged.
+    # It may break the RPM database.
     def set_notify_callback(closure : Callback?, &block)
       if closure
         box_data = CallbackBoxData.new(self, closure)
@@ -226,6 +266,9 @@ module RPM
       end
     end
 
+    # Run the pending transaction
+    #
+    # If callback is not given, default callback will be used.
     def commit(callback : Callback? = nil)
       rc = 1
       set_notify_callback(callback) do
@@ -246,6 +289,24 @@ module RPM
       rc
     end
 
+    # Run the pending transaction, with given callback.
+    #
+    # To handle exception, following form will be safe:
+    # ```crystal
+    #  e : Exception? = nil
+    #  ts.commit do |header, type, amount, total, key|
+    #    # do something here.
+    #  rescue ex : Exception
+    #    if e.nil?
+    #      e = ex
+    #    end
+    #    Pointer(Void).null
+    #  end
+    #  if e
+    #    raise e
+    #  end
+    # ```
+    #
     def commit(&block : Callback)
       commit(block)
     end
