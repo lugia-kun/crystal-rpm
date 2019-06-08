@@ -614,36 +614,41 @@ describe RPM::Transaction do
     describe "Test remove" do
       # TODO: RPM in OpenSUSE works with this semantic, but not in
       # others. This must be investigated...
-      pending "#remove-ed properly" do
-        RPM.transaction(tmproot) do |ts|
-          iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
-          removed = [] of RPM::Package
-          iter.each do |pkg|
-            if pkg[RPM::Tag::Version].as(String) == "1.0" &&
-               pkg[RPM::Tag::Release].as(String) == "0" &&
-               pkg[RPM::Tag::Arch].as(String) == "i586"
-              ts.delete(pkg)
-              removed << pkg
+      {% if flag?("do_remove_test") %}
+        it "#remove-ed properly" do
+          RPM.transaction(tmproot) do |ts|
+            iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
+            removed = [] of RPM::Package
+            iter.each do |pkg|
+              if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+                 pkg[RPM::Tag::Release].as(String) == "0" &&
+                 pkg[RPM::Tag::Arch].as(String) == "i586"
+                ts.delete(pkg)
+                removed << pkg
+              end
             end
+            raise Exception.new("No packages found to remove!") if removed.empty?
+
+            ts.order
+
+            probs = ts.check
+            bad = false
+            probs.each do |prob|
+              bad = true
+              STDERR.puts prob.to_s
+            end
+            raise Exception.new("Transaction has problem") if bad
+
+            ts.clean
+            ts.commit
           end
-          raise Exception.new("No packages found to remove!") if removed.empty?
-
-          ts.order
-
-          probs = ts.check
-          bad = false
-          probs.each do |prob|
-            bad = true
-            STDERR.puts prob.to_s
-          end
-          raise Exception.new("Transaction has problem") if bad
-
-          ts.clean
-          ts.commit
+          test_path = File.join(tmproot, "usr/share/simple/README")
+          File.exists?(test_path).should be_false
         end
-        test_path = File.join(tmproot, "usr/share/simple/README")
-        File.exists?(test_path).should be_false
-      end
+      {% else %}
+        pending "#remove-ed properly (Add `-Ddo_remove_test` to run)" do
+        end
+      {% end %}
     end
   end
 end
@@ -905,33 +910,38 @@ describe RPM::Spec do
 end
 
 describe "Files" do
-  pending "should not be opened" do
-    pid = Process.pid
-    path = "/proc/#{pid}/fd"
-    dbpath = RPM["_dbpath"]
-    system("ls", ["-l", path])
-    Dir.open(path) do |dir|
-      dir.each do |x|
-        fp = File.join(path, x)
-        begin
-          info = File.info(fp, follow_symlinks: false)
-          next unless info.symlink?
-          tg = File.real_path(fp)
-        rescue e : Errno
-          STDERR.puts e.to_s
-          STDERR.flush
-          next
-        end
-        if tg.starts_with?(dbpath)
-          raise "All DB should be closed: '#{tg}' is opened."
+  {% if flag?("do_openfile_test") %}
+    it "should not be opened" do
+      pid = Process.pid
+      path = "/proc/#{pid}/fd"
+      dbpath = RPM["_dbpath"]
+      system("ls", ["-l", path])
+      Dir.open(path) do |dir|
+        dir.each do |x|
+          fp = File.join(path, x)
+          begin
+            info = File.info(fp, follow_symlinks: false)
+            next unless info.symlink?
+            tg = File.real_path(fp)
+          rescue e : Errno
+            STDERR.puts e.to_s
+            STDERR.flush
+            next
+          end
+          if tg.starts_with?(dbpath)
+            raise "All DB should be closed: '#{tg}' is opened."
+          end
         end
       end
+    rescue e : Errno
+      if e.errno != Errno::ENOENT
+        raise e
+      else
+        STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
+      end
     end
-  rescue e : Errno
-    if e.errno != Errno::ENOENT
-      raise e
-    else
-      STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
+  {% else %}
+    pending "should not be opened (Add `-Ddo_openfile_test` to run)" do
     end
-  end
+  {% end %}
 end
