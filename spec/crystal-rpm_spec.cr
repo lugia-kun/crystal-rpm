@@ -926,6 +926,8 @@ describe RPM::Spec do
             Dir.mkdir_p(d)
           end
         end
+        # Re-evaluate rpm macros.
+        RPM.read_config_files
         spec = RPM::Spec.open(fixture("simple.spec"),
           buildroot: nil, rootdir: rootdir)
         amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CLEAN,

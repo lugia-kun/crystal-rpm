@@ -156,6 +156,7 @@ module RPM
       end
     {% else %}
       def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?, rootdir : String? = "/")
+        @filename = specfile
         spec = LibRPM.rpmSpecParse(specfile, flags, buildroot)
         if spec.null?
           raise Exception.new("specfile \"#{specfile}\" parsing failed")
@@ -236,13 +237,16 @@ module RPM
           false
         end
       {% else %}
+        buildroot = (@buildroot || RPM["buildroot"]).not_nil!
+        rootdir = @rootdir
+        null = Pointer(UInt8).null
         xflags = uninitialized LibRPM::BuildArguments_s
         xflags.pkg_flags = pkg_flags
         xflags.build_amount = build_amount
-        xflags.build_root = @buildroot
-        xflags.rootdir = @rootdir
-        pflags = pointerof(xflags).as(BuildArguments)
-        rc = LibRPM.rpmSpecBuild(@ptr, pflags.value)
+        xflags.build_root = buildroot.to_unsafe
+        xflags.rootdir = rootdir ? rootdir.to_unsafe : null
+        pflags = pointerof(xflags).as(LibRPM::BuildArguments)
+        rc = LibRPM.rpmSpecBuild(@ptr, pflags)
         if rc == LibRPM::RC::OK
           true
         else
