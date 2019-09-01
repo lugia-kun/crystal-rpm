@@ -878,9 +878,8 @@ describe RPM::Spec do
 
     it "#packages" do
       pkgs = spec.packages
-      pkgs.size.should eq(2)
-      pkgs.any? { |x| x[RPM::Tag::Name] == "a" }.should be_true
-      pkgs.any? { |x| x[RPM::Tag::Name] == "a-devel" }.should be_true
+      pkg_names = pkgs.map { |x| x[RPM::Tag::Name].as(String) }
+      pkg_names.sort.should eq(["a", "a-devel"])
     end
 
     it "#sources" do
