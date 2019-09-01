@@ -1,4 +1,4 @@
 FROM fedora:28 AS rpm-4.14.2.1
 RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
-RUN dnf install -y rpm-devel crystal which
+RUN dnf install -y rpm-build rpm-devel crystal which
 WORKDIR /work

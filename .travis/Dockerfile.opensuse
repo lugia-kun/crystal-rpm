@@ -1,4 +1,4 @@
 FROM opensuse/tumbleweed AS opensuse
-RUN zypper in -y rpm-devel which libevent-devel pcre-devel curl gcc
+RUN zypper in -y rpm-build rpm-devel which libevent-devel pcre-devel curl gcc
 RUN curl -LO https://github.com/crystal-lang/crystal/releases/download/0.27.2/crystal-0.27.2-1.x86_64.rpm && rpm -ivh crystal-0.27.2-1.x86_64.rpm
 WORKDIR /work

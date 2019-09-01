@@ -1,6 +1,6 @@
 FROM centos:6 AS rpm-4.8.0
 RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
-RUN yum install -y rpm-devel crystal
+RUN yum install -y rpm-devel rpm-build crystal
 RUN rpm -e --nodeps libevent libevent-devel libevent-headers libevent-doc
 RUN yum install -y libevent2 libevent2-devel
 WORKDIR /work
