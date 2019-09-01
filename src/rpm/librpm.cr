@@ -221,7 +221,7 @@ module RPM
     alias ErrorMsg = Pointer(UInt8)
 
     enum RC
-      OK, NOTFOUND, FAIL, NOTTRUSTED, NOKEY
+      OK; NOTFOUND; FAIL; NOTTRUSTED; NOKEY
     end
 
     enum QueryFlags : RPMFlags
@@ -728,15 +728,15 @@ module RPM
     end
 
     enum TagType
-      NULL         = 0,
-      CHAR         = 1,
-      INT8         = 2,
-      INT16        = 3,
-      INT32        = 4,
-      INT64        = 5,
-      STRING       = 6,
-      BIN          = 7,
-      STRING_ARRAY = 8,
+      NULL         = 0
+      CHAR         = 1
+      INT8         = 2
+      INT16        = 3
+      INT32        = 4
+      INT64        = 5
+      STRING       = 6
+      BIN          = 7
+      STRING_ARRAY = 8
       I18NSTRING   = 9
     end
 
@@ -747,7 +747,7 @@ module RPM
     end
 
     enum TagClass
-      NULL, NUMERIC, STRING, BINARY
+      NULL; NUMERIC; STRING; BINARY
     end
 
     fun rpmTagGetName(TagVal) : Pointer(UInt8)
@@ -1071,7 +1071,8 @@ module RPM
     # RPM 4.8 APIs.
     fun parseSpec(Transaction, UInt8*, UInt8*, UInt8*, Int, UInt8*, UInt8*, Int, Int) : Int
     fun rpmtsSpec(Transaction) : Spec
-    fun build(Transaction, UInt8*, BuildArguments, UInt8*) : Int
+    # fun build(Transaction, UInt8*, BuildArguments, UInt8*) : Int
+    fun buildSpec(Transaction, Spec, Int, Int) : RC
 
     # RPM 4.9 APIs.
     @[Flags]
@@ -1125,6 +1126,9 @@ module RPM
   alias TransactionFlags = LibRPM::TransFlags
   alias MireMode = LibRPM::MireMode
   alias ProblemType = LibRPM::ProblemType
+
+  alias BuildPkgFlags = LibRPM::BuildPkgFlags
+  alias BuildFlags = LibRPM::BuildFlags
 
   # Create a problem with RPM 4.9 or later calling convention
   def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)

@@ -203,9 +203,9 @@ module RPM
     # For user-friendly way to apply callback, use following form
     # instead:
     # ```crystal
-    #  ts.commit do |header, type, amount, total, key|
-    #    # do something here.
-    #  end
+    # ts.commit do |header, type, amount, total, key|
+    #   # do something here.
+    # end
     # ```
     #
     # NOTE: We notifies `rpmtsRun` (`#commit`) may raises an Exception
@@ -293,18 +293,20 @@ module RPM
     #
     # To handle exception, following form will be safe:
     # ```crystal
-    #  e : Exception? = nil
-    #  ts.commit do |header, type, amount, total, key|
-    #    # do something here.
-    #  rescue ex : Exception
-    #    if e.nil?
-    #      e = ex
-    #    end
-    #    Pointer(Void).null
-    #  end
-    #  if e
-    #    raise e
-    #  end
+    # e : Exception? = nil
+    # ts.commit do |header, type, amount, total, key|
+    #   # do something here.
+    #
+    #
+    # rescue ex : Exception
+    #   if e.nil?
+    #     e = ex
+    #   end
+    #   Pointer(Void).null
+    # end
+    # if e
+    #   raise e
+    # end
     # ```
     #
     def commit(&block : Callback)

@@ -1,13 +1,16 @@
 module RPM
-  {% begin %}
   class Spec
     getter ptr : LibRPM::Spec
     @hdr : RPM::Package? = nil
     @pkgs : Array(RPM::Package)? = nil
     @srcs : Array(RPM::SourceBase)? = nil
+    @filename : String
 
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
       @ts : LibRPM::Transaction
+    {% else %}
+      @rootdir : String?
+      @buildroot : String?
     {% end %}
 
     class PackageIterator
@@ -20,14 +23,15 @@ module RPM
 
       include Iterator(RPM::Package)
 
-      def initialize(@spec)
-        {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-          iter = @spec.ptr.value.packages
-        {% else %}
-          iter = LibRPM.rpmSpecPkgIterInit(@spec.ptr)
-        {% end %}
-        @iter = iter
-      end
+      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        def initialize(@spec)
+          @iter = @spec.ptr.value.packages
+        end
+      {% else %}
+        def initialize(@spec)
+          @iter = LibRPM.rpmSpecPkgIterInit(@spec.ptr)
+        end
+      {% end %}
 
       def finalize
         {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
@@ -72,14 +76,15 @@ module RPM
 
       include Iterator(RPM::SourceBase)
 
-      def initialize(@spec)
-        {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-          iter = @spec.ptr.value.sources
-        {% else %}
-          iter = LibRPM.rpmSpecSrcIterInit(@spec.ptr)
-        {% end %}
-        @iter = iter
-      end
+      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        def initialize(@spec)
+          @iter = @spec.ptr.value.sources
+        end
+      {% else %}
+        def initialize(@spec)
+          @iter = LibRPM.rpmSpecSrcIterInit(@spec.ptr)
+        end
+      {% end %}
 
       def finalize
         {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
@@ -109,8 +114,8 @@ module RPM
             stop
           else
             src = make_source_instance(@iter.value.flags,
-                                       String.new(@iter.value.full_source),
-                                       @iter.value.num)
+              String.new(@iter.value.full_source),
+              @iter.value.num)
             @iter = @iter.value.next
             src
           end
@@ -120,8 +125,8 @@ module RPM
             stop
           else
             make_source_instance(LibRPM.rpmSpecSrcFlags(src),
-                                 String.new(LibRPM.rpmSpecSrcFilename(src)),
-                                 LibRPM.rpmSpecSrcNum(src))
+              String.new(LibRPM.rpmSpecSrcFilename(src)),
+              LibRPM.rpmSpecSrcNum(src))
           end
         {% end %}
       end
@@ -135,25 +140,31 @@ module RPM
     # Open a specfile and parse it.
     #
     # Recommend to use `RPM::Spec.open`.
-    def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?)
-      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+      def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?, rootdir : String? = "/")
+        @filename = specfile
         ts = LibRPM.rpmtsCreate
-        ret = LibRPM.parseSpec(ts, specfile, "/", buildroot, 0, "", nil,
-                               flags.anyarch? ? 1 : 0,
-                               flags.force? ? 1 : 0)
+        ret = LibRPM.parseSpec(ts, specfile, rootdir, buildroot, 0, "", nil,
+          flags.anyarch? ? 1 : 0,
+          flags.force? ? 1 : 0)
         if ret != 0 || ts.null?
           raise Exception.new("specfile \"#{specfile}\" parsing failed")
         end
-        @ts = ts
         spec = LibRPM.rpmtsSpec(ts)
-      {% else %}
+        @ts = ts
+        @ptr = spec
+      end
+    {% else %}
+      def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?, rootdir : String? = "/")
         spec = LibRPM.rpmSpecParse(specfile, flags, buildroot)
         if spec.null?
           raise Exception.new("specfile \"#{specfile}\" parsing failed")
         end
-      {% end %}
-      @ptr = spec
-    end
+        @rootdir = rootdir
+        @buildroot = buildroot
+        @ptr = spec
+      end
+    {% end %}
 
     # Returns buildroot associated with the specfile.
     #
@@ -164,7 +175,7 @@ module RPM
       {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
         String.new(@ptr.value.buildroot)
       {% else %}
-        RPM["buildroot"]
+        @buildroot || RPM["buildroot"]
       {% end %}
     end
 
@@ -211,11 +222,32 @@ module RPM
       header.conflicts
     end
 
-    def build(flags, test)
+    def build(*, build_amount : BuildFlags, pkg_flags : BuildPkgFlags = BuildPkgFlags::NONE)
+      build_amount &= ~BuildFlags::RMSPEC
+      if build_amount == BuildFlags::NONE
+        raise "No build steps given"
+      end
       {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-        rc = LibRPM.buildSpec(@ptr, flags, test)
+        rc = LibRPM.buildSpec(@ts, @ptr, build_amount.value,
+          build_amount.nobuild? ? 1 : 0)
+        if rc == LibRPM::RC::OK
+          true
+        else
+          false
+        end
       {% else %}
-
+        xflags = uninitialized LibRPM::BuildArguments_s
+        xflags.pkg_flags = pkg_flags
+        xflags.build_amount = build_amount
+        xflags.build_root = @buildroot
+        xflags.rootdir = @rootdir
+        pflags = pointerof(xflags).as(BuildArguments)
+        rc = LibRPM.rpmSpecBuild(@ptr, pflags.value)
+        if rc == LibRPM::RC::OK
+          true
+        else
+          false
+        end
       {% end %}
     end
 
@@ -231,9 +263,8 @@ module RPM
     # Open a specfile
     #
     # This method gives reasonable defaults for each parameters.
-    def self.open(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE | LibRPM::SpecFlags::ANYARCH, buildroot : String? = nil)
-      new(specfile, flags, buildroot)
+    def self.open(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE | LibRPM::SpecFlags::ANYARCH, buildroot : String? = nil, rootdir : String? = "/")
+      new(specfile, flags, buildroot, rootdir)
     end
   end
-  {% end %}
 end

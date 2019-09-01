@@ -13,3 +13,6 @@
 \#*
 
 /spec/c-check.o
+
+# Spec creates directory
+root

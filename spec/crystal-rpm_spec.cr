@@ -862,7 +862,6 @@ describe RPM::Spec do
     it "offsetof members in BuildArguments_s" do
       RPM::LibRPM::BuildArguments_s.offsetof(@rootdir).should eq(CCheck.offset_buildarguments_s("rootdir"))
       RPM::LibRPM::BuildArguments_s.offsetof(@build_amount).should eq(CCheck.offset_buildarguments_s("buildAmount"))
-
     end
   end
 
@@ -905,6 +904,37 @@ describe RPM::Spec do
       cfts = spec.buildconflicts
       cfts.any? { |x| x.name == "e" }.should be_true
       cfts.any? { |x| x.name == "f" }.should be_true
+    end
+  end
+
+  describe "build spec" do
+    it "#builds" do
+      oldhome = ENV["HOME"]
+      if false
+        rootdir = File.join(Dir.current, "root")
+        homedir = File.join(rootdir, "home")
+      else
+        rootdir = "/"
+        homedir = File.join(Dir.current, "root", "home")
+      end
+      rpmbuild = File.join(homedir, "rpmbuild")
+      begin
+        ENV["HOME"] = homedir
+        Dir.mkdir_p(rpmbuild)
+        Dir.cd(rpmbuild) do
+          %w[BUILD RPMS SRPMS BUILDROOT SPECS].each do |d|
+            Dir.mkdir_p(d)
+          end
+        end
+        spec = RPM::Spec.open(fixture("simple.spec"),
+          buildroot: nil, rootdir: rootdir)
+        amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CLEAN,
+          PACKAGESOURCE, PACKAGEBINARY,
+          RMSOURCE, RMBUILD)
+        spec.build(build_amount: amount).should be_true
+      ensure
+        ENV["HOME"] = oldhome
+      end
     end
   end
 end
