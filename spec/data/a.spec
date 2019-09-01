@@ -1,3 +1,5 @@
+%define debug_package %{nil}
+
 Name:           a
 Version:        1.0
 Release:        0
