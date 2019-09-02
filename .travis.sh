@@ -2,6 +2,6 @@
 
 set -v
 
-useradd -u $1 crystal || :
+useradd -u $(stat -c %u spec/data/simple.spec) crystal || :
 crystal version
 crystal spec
