@@ -860,6 +860,10 @@ describe RPM::Transaction do
       path = fixture("simple-1.0-0.i586.rpm")
       pkg = RPM::Package.open(path)
       Dir.mktmpdir do |tmproot|
+        # Create some missing directories which are not handled by #install.
+        install_simple(root: tmproot)
+        rpm("-e", "-r", tmproot, "simple")
+
         RPM.transaction(tmproot) do |ts|
           ts.install(pkg, path)
           types = [] of RPM::CallbackType
@@ -888,7 +892,7 @@ describe RPM::Transaction do
     it "collects problems" do
       # Dependencies are NOT checked here, so we need to generate
       # another problem here.
-      oldlang = ENV["LANG"]
+      oldlang = ENV["LANG"]?
       begin
         ENV["LANG"] = "C"
         Dir.mktmpdir do |tmproot|
