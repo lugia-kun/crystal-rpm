@@ -29,8 +29,8 @@ module RPM
   # ~RPM4.8
   #
   # (note: the function arguments requires dirname and filename
-  #  separatedly, but it simply joins them, so set dirname to `nil` is
-  #  suffice.)
+  #  separatedly, but the upstream implementation simply joins them,
+  #  so set dirname to `nil` is suffice.)
   #
   # ========================================================================
   # type          pkg_nevr      alt_nevr        str            number
@@ -103,7 +103,7 @@ module RPM
       end
     end
 
-    def to_s
+    private def to_problem_str
       return "#<RPM::Problem (null problem)>" if @ptr.null?
       ptr = LibRPM.rpmProblemString(@ptr)
       return "#<RPM::Problem (empty problem)>" if ptr.null?
@@ -112,6 +112,14 @@ module RPM
       ensure
         LibC.free(ptr)
       end
+    end
+
+    def to_s(io)
+      io << to_problem_str
+    end
+
+    def to_s
+      to_problem_str
     end
 
     def <=>(other)
@@ -150,18 +158,20 @@ module RPM
     def initialize(@ptr)
     end
 
-    def initialize(ts : Transaction)
-      ptr = LibRPM.rpmtsProblems(ts.ptr)
-      initialize(ptr)
-    end
-
     def each
       iter = LibRPM.rpmpsInitIterator(self.ptr)
       ProblemSetIterator.new(self, iter)
     end
 
     def each(&block)
-      self.each.each { |x| yield x }
+      iter = LibRPM.rpmpsInitIterator(self.ptr)
+      begin
+        while LibRPM.rpmpsNextIterator(iter) >= 0
+          yield Problem.new(LibRPM.rpmpsGetProblem(iter))
+        end
+      ensure
+        LibRPM.rpmpsFreeIterator(iter)
+      end
     end
 
     def finalize

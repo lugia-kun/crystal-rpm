@@ -32,7 +32,8 @@ module RPM
       rc = LibRPM.rpmtsCheck(@ptr)
       raise Exception.new("RPM: Failed to check transaction") if rc != 0
 
-      ProblemSet.new(self)
+      ptr = LibRPM.rpmtsProblems(ts.ptr)
+      ProblemSet.new(ptr)
     end
 
     # Create a new package iterator with given `tag` and `val`
@@ -175,7 +176,7 @@ module RPM
     # Base method of install, upgrade and delete
     def install_element(pkg : Package, key : String,
                         *, upgrade : Bool = false)
-      raise Exception.new("#{self}: key #{key} must be unique") if @keys.includes?(key)
+      raise Exception.new("key #{key} must be unique") if @keys.includes?(key)
       @keys << key
 
       ret = LibRPM.rpmtsAddInstallElement(@ptr, pkg.hdr, key, upgrade, nil)
@@ -278,7 +279,7 @@ module RPM
           LibRPM.rpmtsEmpty(@ptr)
         elsif rc < 0
           msg = String.new(LibRPM.rpmlogMessage)
-          raise Exception.new("#{self}: #{msg}")
+          raise Exception.new(msg)
         elsif rc > 0
           ps = ProblemSet.new(self)
           ps.each do |problem|

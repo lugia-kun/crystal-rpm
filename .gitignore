@@ -16,3 +16,4 @@
 
 # Spec creates directory
 root
+*.log

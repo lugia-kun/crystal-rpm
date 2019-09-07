@@ -1,8 +1,66 @@
 require "./spec_helper"
 require "tempdir"
 
+puts "Using RPM version #{RPM::PKGVERSION}"
+
+describe "helper" do
+  describe "#rpm" do
+    it "runs rpm" do
+      rpm("--version")
+    end
+
+    it "raises RPMCLIExceptionFailed on failure" do
+      expect_raises(RPMCLIExectionFailed) do
+        rpm("-i", ".", output: Process::Redirect::Close, error: Process::Redirect::Close)
+      end
+    end
+
+    it "sets $? (without block)" do
+      rpm("--version")
+      $?.exit_code.should eq(0)
+    end
+
+    it "sets $? (with block)" do
+      # Wrong argument is intentional.
+      rpm("--vers", raise_on_failure: false, error: Process::Redirect::Pipe) do |x|
+        x.error.gets_to_end.should match(/unknown option/)
+      end
+      $?.success?.should be_false
+    end
+  end
+
+  describe "#is_chroot_possible?" do
+    it "should return true (unless some tests will be skipped)" do
+      is_chroot_possible?.should be_true
+    end
+  end
+
+  describe "#install_simple" do
+    it "installs simple" do
+      Dir.mktmpdir do |root|
+        install_simple(root: root)
+      end
+    end
+
+    it "installs simple_with_deps (implicit --nodeps)" do
+      Dir.mktmpdir do |root|
+        install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: root)
+      end
+    end
+
+    it "fails when attempted to install to \"/\"" do
+      expect_raises(Exception) do
+        install_simple(root: "/")
+      end
+    end
+  end
+end
+
 describe RPM do
-  puts "Using RPM version #{RPM::PKGVERSION}"
+  it "should be compiled with a same version to CLI" do
+    # output may be localized.
+    "RPM version #{RPM::PKGVERSION}".should eq(`env LANG=C rpm --version`.chomp)
+  end
 
   it "has a VERSION matches obtained from pkg-config" do
     RPM::RPMVERSION.should eq(RPM::PKGVERSION)
@@ -92,41 +150,43 @@ describe "RPM::Lib" do
 end
 
 describe RPM::Dependency do
-  prv1 = RPM::Provide.new("foo", RPM::Version.new("2", "1"),
-    RPM::Sense::EQUAL, nil)
-  req1 = RPM::Require.new("foo", RPM::Version.new("1", "1"),
-    RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
-  prv2 = RPM::Provide.new("foo", RPM::Version.new("2", "2"),
-    RPM::Sense::EQUAL, nil)
-  req2 = RPM::Require.new("bar", RPM::Version.new("1", "1"),
-    RPM::Sense::EQUAL | RPM::Sense::GREATER, nil)
-
   describe "#satisfies?" do
     it "returns true if dependencies satisfy" do
+      eq = RPM::Sense.flags(EQUAL)
+      ge = RPM::Sense.flags(EQUAL, GREATER)
+      v1 = RPM::Version.new("2", "1")
+      v2 = RPM::Version.new("1", "1")
+      prv1 = RPM::Provide.new("foo", v1, eq, nil)
+      req1 = RPM::Require.new("foo", v2, ge, nil)
+
       req1.satisfies?(prv1).should be_true
       prv1.satisfies?(req1).should be_true
     end
 
     it "returns false if name does not overlap" do
+      eq = RPM::Sense.flags(EQUAL)
+      ge = RPM::Sense.flags(EQUAL, GREATER)
+      v2 = RPM::Version.new("1", "1")
+      v3 = RPM::Version.new("2", "1")
+      prv2 = RPM::Provide.new("foo", v3, eq, nil)
+      req2 = RPM::Require.new("bar", v2, ge, nil)
+
       req2.satisfies?(prv2).should be_false
     end
   end
 end
 
 describe RPM::File do
-  f =
-    {% begin %}
-    RPM::File.new("path", "md5sum", "", 42_u32,
-                  {% if Time.class.methods.find { |x| x.name == "local" } %}
-                    Time.local(2019, 1, 1, 9, 0, 0),
-                  {% else %}
-                    Time.new(2019, 1, 1, 9, 0, 0),
-                  {% end %}
-                  "owner", "group",
-                  43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
-                  RPM::FileState::NORMAL)
-    {% end %}
   it "has flags" do
+    time = {% if Time.class.methods.find { |x| x.name == "local" } %}
+             Time.local(2019, 1, 1, 9, 0, 0)
+           {% else %}
+             Time.new(2019, 1, 1, 9, 0, 0)
+           {% end %}
+    f = RPM::File.new("path", "md5sum", "", 42_u32, time, "owner", "group",
+      43_u16, 0o777_u16, RPM::FileAttrs.from_value(44_u32),
+      RPM::FileState::NORMAL)
+
     f.symlink?.should be_false
     f.config?.should be_false
     f.doc?.should be_false
@@ -196,30 +256,35 @@ describe RPM::TagData do
 end
 
 describe RPM::Package do
-  pkg = RPM::Package.create("foo", RPM::Version.new("1.0"))
-  describe "created package #{pkg}" do
-    it "has name 'foo'" do
+  describe "#name" do
+    it "has a name" do
+      pkg = RPM::Package.create("foo", RPM::Version.new("1.0"))
       pkg.name.should eq("foo")
     end
+  end
 
+  describe "#signature" do
     it "has no signature" do
+      pkg = RPM::Package.create("foo", RPM::Version.new("1.0"))
       pkg.signature.should eq("(none)")
     end
   end
 
-  pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
-  describe "opened package #{pkg}" do
-    req = RPM::Require.new("simple", RPM::Version.new("1.0", "0"),
-      RPM::Sense::GREATER | RPM::Sense::EQUAL, nil)
-    it "provides dependency #{req.to_dnevr}" do
+  describe "reading package" do
+    it "provides dependency" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      req = RPM::Require.new("simple", RPM::Version.new("1.0", "0"),
+        RPM::Sense.flags(GREATER, EQUAL), nil)
       req.satisfies?(pkg).should be_true
     end
 
     it "has a known signature" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg.signature.should eq("3b5f9d468c877166532c662e29f43bc3")
     end
 
     it "can provide TagData" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       tag = RPM::TagData.for(pkg.hdr, RPM::Tag::Arch)
       tag.size.should eq(1)
       tag[0].should eq("i586")
@@ -230,50 +295,62 @@ describe RPM::Package do
     end
 
     it "has a name 'simple'" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::Name].should eq("simple")
     end
 
     it "is built for i586" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::Arch].should eq("i586")
     end
 
-    old_lang = ENV["LC_ALL"]?
-    ENV["LC_ALL"] = "C"
+    # [LANG, Summary, Description]
+    {% for lang in [["C", "Simple dummy package", "Dummy package"],
+                    ["es_ES.UTF-8", "Paquete simple de muestra", "Paquete de muestra"]] %}
+      it "has a {{lang[0].id}} summary" do
+        pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+        old_lang = ENV["LC_ALL"]?
+        begin
+          ENV["LC_ALL"] = {{lang[0]}}
+          pkg[RPM::Tag::Summary].should eq({{lang[1]}})
+        ensure
+          ENV["LC_ALL"] = old_lang
+        end
+      end
+      it "has a {{lang[0].id}} description" do
+        pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+        old_lang = ENV["LC_ALL"]?
+        begin
+          ENV["LC_ALL"] = {{lang[0]}}
+          pkg[RPM::Tag::Description].should eq({{lang[2]}})
+        ensure
+          ENV["LC_ALL"] = old_lang
+        end
+      end
+    {% end %}
 
-    it "has a summary" do
-      pkg[RPM::Tag::Summary].should eq("Simple dummy package")
-    end
-    it "has a description" do
-      pkg[RPM::Tag::Description].should eq("Dummy package")
-    end
     it "has a signature" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::SigMD5].should eq(Bytes[0x3b, 0x5f, 0x9d, 0x46, 0x8c, 0x87, 0x71, 0x66, 0x53, 0x2c, 0x66, 0x2e, 0x29, 0xf4, 0x3b, 0xc3])
     end
 
-    ENV["LC_ALL"] = "es_ES.UTF-8"
-
-    it "has a Spanish summary" do
-      pkg[RPM::Tag::Summary].should eq("Paquete simple de muestra")
-    end
-    it "has a Spanish description" do
-      pkg[RPM::Tag::Description].should eq("Paquete de muestra")
-    end
-
-    ENV["LC_ALL"] = old_lang
-
     it "contains 2 files ownd by root" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::FileUserName].should eq(%w[root root])
     end
     it "contains 2 files with known sizes" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::FileSizes].should eq([6, 5])
     end
 
     it "provides 2 dependencies" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg.provides.map { |x| x.name }.to_set
         .should eq(Set{"simple(x86-32)", "simple"})
     end
 
     it "contains 2 files with known paths" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg.files.map { |x| x.path }.to_set
         .should eq(Set{
         "/usr/share/simple/README",
@@ -282,6 +359,7 @@ describe RPM::Package do
     end
 
     it "contains a empty link_to for a regular file" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       file = pkg.files.find { |x| x.path == "/usr/share/simple/README" }
       file.is_a?(RPM::File).should be_true
 
@@ -294,43 +372,52 @@ describe RPM::Package do
     end
   end
 
-  pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
-  describe "dependencies of #{pkg}" do
+  describe "dependencies of a package" do
     it "has a known name" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.name.should eq("simple_with_deps")
     end
 
     it "provides \"simple_with_deps(x86-32)\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.provides.any? { |x| x.name == "simple_with_deps(x86-32)" }.should be_true
     end
 
     it "provides \"simple_with_deps\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.provides.any? { |x| x.name == "simple_with_deps" }.should be_true
     end
 
     it "requires \"a\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.requires.any? { |x| x.name == "a" }.should be_true
     end
 
-    b = pkg.requires.find { |x| x.name == "b" }
     it "requires \"b\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      b = pkg.requires.find { |x| x.name == "b" }
       b.should be_truthy
     end
 
     it "requires \"b-1.0\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      b = pkg.requires.find { |x| x.name == "b" }
       req = b.as(RPM::Require)
       req.version.to_s.should eq("1.0")
     end
 
     it "conflicts with \"c\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.conflicts.any? { |x| x.name == "c" }.should be_true
     end
 
     it "conflicts with \"d\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.conflicts.any? { |x| x.name == "d" }.should be_true
     end
 
     it "obsoletes \"f\"" do
+      pkg = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
       pkg.obsoletes.any? { |x| x.name == "f" }.should be_true
     end
   end
@@ -338,16 +425,18 @@ end
 
 describe RPM::Problem do
   describe ".create-ed problem (RPM 4.9 style)" do
-    problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
     it "has #key" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
       String.new(problem.key.as(Pointer(UInt8))).should eq("foo.rpm")
     end
 
     it "has #type" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
       problem.type.should eq(RPM::ProblemType::REQUIRES)
     end
 
     it "has string #str" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
       {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
         problem.str.should eq("foo-1.0-0")
       {% else %}
@@ -356,17 +445,19 @@ describe RPM::Problem do
     end
 
     it "descriptive #to_s" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
       problem.to_s.should eq("Hello is needed by (installed) bar-1.0-0")
     end
   end
 
-  problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
   describe ".create-ed problem (RPM 4.8 style)" do
     it "has #type" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
       problem.type.should eq(RPM::ProblemType::REQUIRES)
     end
 
     it "has string #str" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
       {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
         problem.str.should eq("")
       {% else %}
@@ -375,29 +466,39 @@ describe RPM::Problem do
     end
 
     it "descriptive #to_s" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
       problem.to_s.should eq("Hello is needed by (installed) bar-1.0-0")
     end
   end
 
-  problem2 = RPM::Problem.new(problem.ptr)
   describe ".new from Existing pointer" do
     it "has same key" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem2 = RPM::Problem.new(problem.ptr)
       problem2.key.should eq(problem.key)
     end
 
     it "has same type" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem2 = RPM::Problem.new(problem.ptr)
       problem2.type.should eq(problem.type)
     end
 
     it "has same str" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem2 = RPM::Problem.new(problem.ptr)
       problem2.str.should eq(problem.str)
     end
 
     it "has same description" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem2 = RPM::Problem.new(problem.ptr)
       problem2.to_s.should eq(problem.to_s)
     end
 
     it "can duplicate" do
+      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem2 = RPM::Problem.new(problem.ptr)
       d = problem2.dup
       d.key.should eq(problem.key)
     end
@@ -406,11 +507,14 @@ end
 
 describe RPM::Transaction do
   describe "#root_dir" do
-    RPM.transaction do |ts|
-      it "has default root directory \"/\"" do
+    it "has default root directory \"/\"" do
+      RPM.transaction do |ts|
         ts.root_dir.should eq("/")
       end
-      it "has been set to root directory \"#{Dir.tempdir}\"" do
+    end
+    it "can set to root directory" do
+      # just setting rootdir does not require `chroot`.
+      RPM.transaction do |ts|
         ts.root_dir = Dir.tempdir
         ts.root_dir.should eq(Dir.tempdir + "/")
       end
@@ -418,55 +522,97 @@ describe RPM::Transaction do
   end
 
   describe "#flags" do
-    RPM.transaction do |ts|
-      it "has default transaction flag NONE" do
+    it "has default transaction flag NONE" do
+      RPM.transaction do |ts|
         ts.flags.should eq(RPM::TransactionFlags::NONE)
       end
-      ts.flags = RPM::TransactionFlags::TEST
-      it "has now tranaction flag TEST" do
+    end
+
+    it "can set tranaction flag to TEST" do
+      RPM.transaction do |ts|
+        ts.flags = RPM::TransactionFlags::TEST
         ts.flags.should eq(RPM::TransactionFlags::TEST)
       end
     end
   end
 
-  Dir.mktmpdir do |tmproot|
-    describe "Test install" do
-      path = fixture("simple-1.0-0.i586.rpm")
-      pkg = RPM::Package.open(path)
-      it "#install-ed \"#{pkg[RPM::Tag::Name]}\"" do
-        RPM.transaction(tmproot) do |ts|
-          ts.install(pkg, path)
-          ts.commit
-        end
-        test_path = File.join(tmproot, "usr/share/simple/README")
-        File.exists?(test_path).should be_true
-      end
-    end
-
-    describe "Test iterator" do
-      a_installed_pkg = nil
-      dir = tmproot
-
-      describe "#init_iterator" do
+  describe "Test iterator" do
+    describe "#init_iterator" do
+      it "returns MatchIterator" do
         RPM.transaction do |ts|
           iter = ts.init_iterator
-          it "returns MatchIterator" do
+          begin
             iter.class.should eq(RPM::MatchIterator)
+          ensure
+            iter.finalize
           end
         end
+      end
 
-        # Base test
-        it "looks for a package" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator
+      # Base test
+      it "looks for a package" do
+        a_installed_pkg = nil
+        if (chroot = is_chroot_possible?)
+          tmpdir = Dir.mktmpdir
+          root = tmpdir.path
+          install_simple(root: root)
+        else
+          root = "/"
+        end
+        RPM.transaction(root) do |ts|
+          iter = ts.init_iterator
+          begin
             a_installed_pkg = iter.first?
-            a_installed_pkg.should_not be_nil
+            if chroot
+              a_installed_pkg.should_not be_nil
+            end
+          ensure
+            iter.finalize
           end
         end
+        if a_installed_pkg.nil?
+          ret = rpm("-qa", "-r", root)
+          ret.not_nil!.chomp.should eq("") # nothing installed
+        else
+          name = a_installed_pkg[RPM::Tag::Name].as(String)
+          version = a_installed_pkg[RPM::Tag::Version].as(String)
+          release = a_installed_pkg[RPM::Tag::Release].as(String)
+          arch = a_installed_pkg[RPM::Tag::Arch].as(String)
+          nvra = "#{name}-#{version}-#{release}.#{arch}"
+          rpm("-q", "-r", root, nvra).not_nil!.chomp.should eq(nvra)
+        end
+      ensure
+        if tmpdir
+          tmpdir.close
+        end
+      end
 
-        it "looks for a package contains a file" do
-          RPM.transaction(dir) do |ts|
+      if is_chroot_possible?
+        it "looks for a package (while nothing installed)" do
+          a_installed_pkg = nil
+          tmpdir = Dir.mktmpdir
+          root = tmpdir.path
+          RPM.transaction(root) do |ts|
             iter = ts.init_iterator
+            begin
+              a_installed_pkg = iter.first?
+              a_installed_pkg.should be_nil
+            ensure
+              iter.finalize
+            end
+          end
+        ensure
+          if tmpdir
+            tmpdir.close
+          end
+        end
+      end
+
+      it "looks for a package contains a file" do
+        a_installed_pkg = nil
+        RPM.transaction do |ts|
+          iter = ts.init_iterator
+          begin
             iter.each do |x|
               if (has_files = x[RPM::Tag::BaseNames]).is_a?(Array(String))
                 if has_files.size > 0
@@ -475,101 +621,249 @@ describe RPM::Transaction do
                 end
               end
             end
+          ensure
+            iter.finalize
           end
         end
-
-        # File name search test. (just an example)
-        it "looks for packages contains a file" do
-          files = a_installed_pkg.as(RPM::Package).files
-          idx = Random.rand(files.size)
-          path = files[idx].path
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator(RPM::DbiTag::BaseNames, path)
-            n = 0
-            iter.each do |pkg|
-              pkg.files.any? { |file| file.path == path }.should be_true
-              n += 1
+        if a_installed_pkg.nil?
+          rpm("-qal").should eq("\n") # no files installed by rpm.
+        else
+          name = a_installed_pkg[RPM::Tag::Name].as(String)
+          version = a_installed_pkg[RPM::Tag::Version].as(String)
+          release = a_installed_pkg[RPM::Tag::Release].as(String)
+          arch = a_installed_pkg[RPM::Tag::Arch].as(String)
+          files = rpm("-ql", "#{name}-#{version}-#{release}.#{arch}") do |prc|
+            lines = Set(String).new
+            while (l = prc.output.gets)
+              lines << l
             end
-            n.should be > 0
+            lines
+          end
+          a_installed_pkg.files.map(&.path).to_set.should eq(files)
+        end
+      end
+
+      # File name search test. (just an example)
+      it "looks for packages contains specfic file" do
+        a_installed_pkg = nil
+        if (chroot = is_chroot_possible?)
+          tmpdir = Dir.mktmpdir
+          root = tmpdir.path
+          install_simple(root: root)
+        else
+          root = "/"
+        end
+        target_file = rpm("-qal", "-r", root) do |proc|
+          line = proc.output.gets
+          proc.output.close
+          line ? line.chomp : nil
+        end
+        if target_file.nil? || target_file == ""
+          raise "No package contains files (please run with fakechroot)"
+        end
+        RPM.transaction(root) do |ts|
+          iter = ts.init_iterator(RPM::DbiTag::BaseNames, target_file)
+          begin
+            a_installed_pkg = iter.map { |x| x[RPM::Tag::Name].as(String) }
+            a_installed_pkg.sort!
+          ensure
+            iter.finalize
           end
         end
-
-        it "looks for package not found (by searching package '......')" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator(RPM::DbiTag::Name, "......")
-            iter.to_a.should eq([] of RPM::Package)
-          end
+        a_installed_pkg.not_nil!
+      ensure
+        if tmpdir
+          tmpdir.close
         end
+      end
 
-        it "looks for package not found (by searching filename '/tmp/foo')" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator(RPM::DbiTag::BaseNames, "/tmp/foo")
+      it "looks for a package not found by name" do
+        RPM.transaction do |ts|
+          # NB: "......" is not valid RPM package name.
+          iter = ts.init_iterator(RPM::DbiTag::Name, "......")
+          begin
             iter.to_a.should eq([] of RPM::Package)
+          ensure
+            iter.finalize
           end
         end
       end
 
-      describe "#version" do
-        pkg = a_installed_pkg.as(RPM::Package)
-        vers = pkg[RPM::Tag::Version].as(String)
-        it "looks for packages whose version is \"#{vers}\"" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator
-            iter.version(RPM::Version.new(vers))
-            n = 0
-            iter.each do |sig|
-              n += 1
-              sig[RPM::Tag::Version].should eq(vers)
+      it "looks for a package not found by file" do
+        Dir.mktmpdir do |tmpdir|
+          ret = rpm("-qf", tmpdir, raise_on_failure: false, error: Process::Redirect::Close)
+          $?.exit_code.should_not eq(0)
+          RPM.transaction do |ts|
+            iter = ts.init_iterator(RPM::DbiTag::BaseNames, tmpdir)
+            begin
+              iter.to_a.should eq([] of RPM::Package)
+            ensure
+              iter.finalize
             end
-            n.should be > 0
-          end
-        end
-      end
-
-      describe "#regexp" do
-        pkg = a_installed_pkg.as(RPM::Package)
-        name = pkg[RPM::Tag::Name].as(String)
-        patname = name[0..1]
-        pat = patname + "*"
-        it "looks for packages whose name matches \"#{pat}\"" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator
-            iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pat)
-            n = 0
-            iter.each do |pkg|
-              n += 1
-              pkg[RPM::Tag::Name].as(String).should start_with(patname)
-            end
-            n.should be > 0
-          end
-        end
-
-        files = pkg.files
-        idx = Random.rand(files.size)
-        basename = File.basename(files[idx].path)
-        it "looks for packages which contain a file whose basename is \"#{basename}\"" do
-          RPM.transaction(dir) do |ts|
-            iter = ts.init_iterator
-            iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, basename)
-            n = 0
-            iter.each do |pkg|
-              n += 1
-              pkg.files.any? { |x| File.basename(x.path) == basename }.should be_true
-            end
-            n.should be > 0
           end
         end
       end
     end
 
-    describe "Test callback" do
+    describe "#version" do
+      it "looks for packages by version" do
+        a_installed_pkg = nil
+        if (chroot = is_chroot_possible?)
+          tmpdir = Dir.mktmpdir
+          root = tmpdir.path
+          install_simple(root: root)
+        else
+          root = "/"
+        end
+        names, a_version = rpm("-qa", "-r", root, "--queryformat", "%{name}\\t%{epoch}\\t%{version}-%{release}\\t%{arch}\\n") do |prc|
+          l = prc.output.gets
+          if l
+            a = l.split("\t")
+            names = Set(Tuple(String, String)).new
+            names << {a[0], a[3]}
+            epoch = a[1]
+            version = a[2]
+            while (l = prc.output.gets)
+              a = l.split("\t")
+              if a[1] == epoch && a[2] == version
+                names << {a[0], a[3]}
+              end
+            end
+            if epoch == "(none)"
+              evr = version
+            else
+              evr = epoch + ":" + version
+            end
+            {names, evr}
+          else
+            {nil, nil}
+          end
+        end
+        names = names.not_nil!
+        a_version = a_version.not_nil!
+
+        RPM.transaction(root) do |ts|
+          iter = ts.init_iterator
+          begin
+            iter.version(RPM::Version.new(a_version))
+            pkgs = Set(Tuple(String, String)).new
+            iter.each do |sig|
+              pkgs << {sig.name, sig[RPM::Tag::Arch].as(String)}
+            end
+            pkgs.should eq(names)
+          ensure
+            iter.finalize
+          end
+        end
+      ensure
+        if tmpdir
+          tmpdir.close
+        end
+      end
+    end
+
+    describe "#regexp" do
+      it "looks for packages whose name matches to a glob" do
+        a_installed_pkg = nil
+        if (chroot = is_chroot_possible?)
+          tmpdir = Dir.mktmpdir
+          root = tmpdir.path
+          install_simple(root: root)
+          install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: root)
+        else
+          root = "/"
+        end
+        basename = rpm("-qa", "-r", root, "--queryformat", "%{name}\\n") do |prc|
+          l = prc.output.gets
+          prc.output.close
+          l
+        end
+        if !basename
+          raise "No packages installed (and not allowed to do chroot)"
+        end
+
+        # We want a pattern which matches with 2 or more packages.
+        reference = nil
+        pattern = nil
+        (1...basename.size).to_a.bsearch do |i|
+          pattern = basename[0..i] + "*"
+          reference = rpm("-qa", "-r", root, pattern, "--queryformat", "%{name}\\t%{epoch}\\t%{version}\\t%{release}\\t%{arch}\\n") do |prc|
+            names = Set(Tuple(String, String, String, UInt32?, String)).new
+            while (l = prc.output.gets)
+              a = l.split("\t")
+              name = a[0]
+              epoch = a[1]
+              version = a[2]
+              release = a[3]
+              arch = a[4]
+              if epoch == "(none)"
+                e = nil
+              else
+                e = epoch.to_u32
+              end
+              names << {name, version, release, e, arch}
+            end
+            names
+          end
+          SPEC_DEBUG_LOG.debug {
+            "#regexp refenrece pattern \"#{pattern}\", count: #{reference.size}"
+          }
+          if reference.size <= 1
+            true
+          else
+            break
+          end
+        end
+        reference = reference.not_nil!
+        pattern = pattern.not_nil!
+
+        RPM.transaction(root) do |ts|
+          iter = ts.init_iterator
+          begin
+            iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pattern)
+            pkgs = Set(Tuple(String, String, String, UInt32?, String)).new
+            iter.each do |pkg|
+              n = pkg.name
+              v = pkg[RPM::Tag::Version].as(String)
+              r = pkg[RPM::Tag::Release].as(String)
+              e = pkg[RPM::Tag::Epoch].as(UInt32 | Nil)
+              a = pkg[RPM::Tag::Arch].as(String)
+              tup = {n, v, r, e, a}
+              pkgs << tup
+            end
+            pkgs.should eq(reference)
+          ensure
+            iter.finalize
+          end
+        end
+      end
+    end
+  end
+
+  describe "#install" do
+    it "installs simple package" do
       path = fixture("simple-1.0-0.i586.rpm")
       pkg = RPM::Package.open(path)
-      RPM.transaction(tmproot) do |ts|
-        ts.install(pkg, path)
-        types = [] of RPM::CallbackType
-        ts.commit do |pkg, type|
-          it "runs expectations in the block" do
+      Dir.mktmpdir do |tmproot|
+        RPM.transaction(tmproot) do |ts|
+          ts.install(pkg, path)
+          ts.commit
+        end
+        test_path = File.join(tmproot, "usr/share/simple/README")
+        File.exists?(test_path).should be_true
+      end
+    end
+  end
+
+  describe "#callback" do
+    it "runs expectations in the block" do
+      path = fixture("simple-1.0-0.i586.rpm")
+      pkg = RPM::Package.open(path)
+      Dir.mktmpdir do |tmproot|
+        RPM.transaction(tmproot) do |ts|
+          ts.install(pkg, path)
+          types = [] of RPM::CallbackType
+          ts.commit do |pkg, type|
             case type
             when RPM::CallbackType::TRANS_PROGRESS,
                  RPM::CallbackType::TRANS_START,
@@ -578,44 +872,55 @@ describe RPM::Transaction do
             else
               # other values are ignored.
             end
+            types << type
+            nil
           end
-          types << type
-          nil
-        end
-        it "collects transaction callback types" do
+
           types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
                                    RPM::CallbackType::TRANS_PROGRESS,
                                    RPM::CallbackType::TRANS_STOP])
         end
       end
     end
+  end
 
-    describe "Test problem" do
-      path = fixture("simple-1.0-0.i586.rpm")
-      pkg = RPM::Package.open(path)
-      RPM.transaction(tmproot) do |ts|
-        ts.install(pkg, path)
-        ts.order
-        ts.clean
-        it "rejects installation" do
-          ts.commit.should_not eq(0)
-        end
+  describe "#check" do
+    it "collects problems" do
+      # Dependencies are NOT checked here, so we need to generate
+      # another problem here.
+      oldlang = ENV["LANG"]
+      begin
+        ENV["LANG"] = "C"
+        Dir.mktmpdir do |tmproot|
+          file = "simple-1.0-0.i586.rpm"
+          install_simple(package: file, root: tmproot)
+          path = fixture(file)
+          pkg = RPM::Package.open(path)
+          RPM.transaction do |ts|
+            ts.install(pkg, path)
+            ts.order
+            ts.clean
+            ts.commit.should_not eq(0)
 
-        it "collects problems" do
-          probs = RPM::ProblemSet.new(ts)
-          prob = probs.each.find do |prob|
-            prob.to_s == "package simple-1.0-0.i586 is already installed"
+            probs = ts.check
+            set = probs.map { |x| { x.type, x.key, x.str } }.to_set
+            p set
           end
-          prob.should_not be_nil
         end
+      ensure
+        ENV["LANG"] = oldlang
       end
     end
+  end
 
-    describe "Test remove" do
-      # TODO: RPM in OpenSUSE works with this semantic, but not in
-      # others. This must be investigated...
-      {% if flag?("do_remove_test") %}
-        it "#remove-ed properly" do
+  describe "#delete" do
+    # TODO: RPM in OpenSUSE works with this semantic, but not in
+    # others. This must be investigated...
+    {% if flag?("do_remove_test") %}
+      it "removes a pacakge" do
+        Dir.mktmpdir do |tmproot|
+          install_simple(root: tmproot)
+          install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: tmproot)
           RPM.transaction(tmproot) do |ts|
             iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
             removed = [] of RPM::Package
@@ -627,8 +932,9 @@ describe RPM::Transaction do
                 removed << pkg
               end
             end
-            raise Exception.new("No packages found to remove!") if removed.empty?
-
+            if removed.empty?
+              raise Exception.new("No packages found to remove!")
+            end
             ts.order
 
             probs = ts.check
@@ -645,20 +951,14 @@ describe RPM::Transaction do
           test_path = File.join(tmproot, "usr/share/simple/README")
           File.exists?(test_path).should be_false
         end
-      {% else %}
-        pending "#remove-ed properly (Add `-Ddo_remove_test` to run)" do
-        end
-      {% end %}
-    end
+      end
+    {% else %}
+      pending "removes a package (Add `-Ddo_remove_test` to run)"
+    {% end %}
   end
 end
 
 describe RPM::Version do
-  a = RPM::Version.new("1.0.0-0.1m")
-  b = RPM::Version.new("0.9.0-1m")
-  c = RPM::Version.new("1.0.0-0.11m")
-  d = RPM::Version.new("0.9.0-1m", 1)
-
   describe ".parse_evr" do
     it "parses EVR format into Set of {Epoch, Version, Release}" do
       RPM::Version.parse_evr("23:1.0.3-1suse").should eq({23, "1.0.3", "1suse"})
@@ -669,6 +969,11 @@ describe RPM::Version do
 
   describe "#<=>" do
     it "can compare as Comparable" do
+      a = RPM::Version.new("1.0.0-0.1m")
+      b = RPM::Version.new("0.9.0-1m")
+      c = RPM::Version.new("1.0.0-0.11m")
+      d = RPM::Version.new("0.9.0-1m", 1)
+
       (a > b).should be_true
       (a < c).should be_true
       (a < d).should be_true
@@ -677,6 +982,11 @@ describe RPM::Version do
 
   describe "#newer?" do
     it "returns true if receiver is newer than given version" do
+      a = RPM::Version.new("1.0.0-0.1m")
+      b = RPM::Version.new("0.9.0-1m")
+      c = RPM::Version.new("1.0.0-0.11m")
+      d = RPM::Version.new("0.9.0-1m", 1)
+
       a.newer?(b).should be_true
       c.newer?(a).should be_true
       d.newer?(a).should be_true
@@ -686,6 +996,11 @@ describe RPM::Version do
 
   describe "#older?" do
     it "returns true if receiver is older than given version" do
+      a = RPM::Version.new("1.0.0-0.1m")
+      b = RPM::Version.new("0.9.0-1m")
+      c = RPM::Version.new("1.0.0-0.11m")
+      d = RPM::Version.new("0.9.0-1m", 1)
+
       b.older?(a).should be_true
       a.older?(c).should be_true
       a.older?(d).should be_true
@@ -695,83 +1010,100 @@ describe RPM::Version do
 
   describe "#v" do
     it "returns version part" do
+      d = RPM::Version.new("0.9.0-1m", 1)
       d.v.should eq("0.9.0")
     end
   end
 
   describe "#r" do
     it "returns release part" do
+      d = RPM::Version.new("0.9.0-1m", 1)
       d.r.should eq("1m")
     end
   end
 
   describe "#e" do
     it "returns epoch part" do
+      d = RPM::Version.new("0.9.0-1m", 1)
       d.e.should eq(1)
     end
   end
 
   describe "#to_s" do
     it "returns stringified Version and Relase" do
+      b = RPM::Version.new("0.9.0-1m")
       b.to_s.should eq("0.9.0-1m")
+
+      d = RPM::Version.new("0.9.0-1m", 1)
       d.to_s.should eq("0.9.0-1m")
     end
   end
 
   describe "#to_vre" do
     it "returns stringified Version, Release and Epoch" do
+      b = RPM::Version.new("0.9.0-1m")
       b.to_vre.should eq("0.9.0-1m")
+
+      d = RPM::Version.new("0.9.0-1m", 1)
       d.to_vre.should eq("1:0.9.0-1m")
     end
   end
 
   describe "zero-epoch and nil-epoch" do
-    v1 = RPM::Version.new("1-2")
-    v2 = RPM::Version.new("0:1-2")
-
     it "will be nil for nil-epoch" do
+      v1 = RPM::Version.new("1-2")
       v1.e.should be_nil
     end
 
     it "will be 0 for 0-epoch" do
+      v2 = RPM::Version.new("0:1-2")
       v2.e.should eq(0)
     end
 
     it "equals" do
+      v1 = RPM::Version.new("1-2")
+      v2 = RPM::Version.new("0:1-2")
+
       (v1 == v2).should be_true
       v1.should eq(v2)
     end
 
     it "equals their hash" do
+      v1 = RPM::Version.new("1-2")
+      v2 = RPM::Version.new("0:1-2")
+
       v1.hash.should eq(v2.hash)
     end
   end
 end
 
 describe RPM::Source do
-  a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
-  b = RPM::Source.new("http://example.com/fuga/fuga.tar.gz", 1, true)
-
   describe "#fullname" do
     it "returns full source name" do
+      a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
       a.fullname.should eq("http://example.com/hoge/hoge.tar.bz2")
     end
   end
 
   describe "#to_s" do
     it "returns full souce name" do
+      a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
       a.fullname.should eq("http://example.com/hoge/hoge.tar.bz2")
     end
   end
 
   describe "#filename" do
     it "returns basename of the source" do
+      a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
       a.filename.should eq("hoge.tar.bz2")
     end
   end
 
   describe "#number" do
     it "returns number assinged to source" do
+      a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
+      b = RPM::Source.new("http://example.com/fuga/fuga.tar.gz", 1, true)
+
       a.number.should eq(0)
       b.number.should eq(1)
     end
@@ -779,6 +1111,9 @@ describe RPM::Source do
 
   describe "#no?" do
     it "returns whether the source is packeged into src.rpm" do
+      a = RPM::Source.new("http://example.com/hoge/hoge.tar.bz2", 0)
+      b = RPM::Source.new("http://example.com/fuga/fuga.tar.gz", 1, true)
+
       a.no?.should be_false
       b.no?.should be_true
     end
@@ -786,153 +1121,126 @@ describe RPM::Source do
 end
 
 describe RPM::Spec do
-  sz_spec_s = CCheck.sizeof_spec_s
-  case sz_spec_s
-  when -1
-    {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-      pending "sizeof rpmSpec_s (compilation error)" do
-      end
-    {% else %}
-      it "sizeof rpmSpec_s (it's not public in rpm 4.9 or later)" do
-        true.should be_true
-      end
-    {% end %}
-  else
-    it "sizeof rpmSpec_s" do
+  it "sizeof rpmSpec_s" do
+    sz_spec_s = CCheck.sizeof_spec_s
+    case sz_spec_s
+    when -1
+      {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+        raise "compilation failed"
+      {% else %}
+        # Nothing can be checked.
+      {% end %}
+    else
       sizeof(RPM::LibRPM::Spec_s).should eq(sz_spec_s)
+
+      RPM::LibRPM::Spec_s.offsetof(@spec_file).should eq(CCheck.offset_spec_s("specFile"))
+      RPM::LibRPM::Spec_s.offsetof(@lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
+      RPM::LibRPM::Spec_s.offsetof(@sources).should eq(CCheck.offset_spec_s("sources"))
+      RPM::LibRPM::Spec_s.offsetof(@packages).should eq(CCheck.offset_spec_s("packages"))
     end
   end
 
-  {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-    if sz_spec_s != -1
-      it "offsetof members in rpmSpec_s" do
-        RPM::LibRPM::Spec_s.offsetof(@spec_file).should eq(CCheck.offset_spec_s("specFile"))
-        RPM::LibRPM::Spec_s.offsetof(@lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
-        RPM::LibRPM::Spec_s.offsetof(@sources).should eq(CCheck.offset_spec_s("sources"))
-        RPM::LibRPM::Spec_s.offsetof(@packages).should eq(CCheck.offset_spec_s("packages"))
-      end
+  it "sizeof Package_s" do
+    sz_pkg_s = CCheck.sizeof_package_s
+    case sz_pkg_s
+    when -1
+      {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+        raise "compilation failed"
+      {% else %}
+        # Nothing can be checked.
+      {% end %}
     else
-      pending "offsetof members in rpmSpec_s (compilation error)" do
-      end
-    end
-  {% end %}
-
-  sz_pkg_s = CCheck.sizeof_package_s
-  case sz_pkg_s
-  when -1
-    {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-      pending "sizeof Package_s (compilation error)" do
-      end
-    {% else %}
-      it "sizeof Package_s (it's not public in rpm 4.9 or later)" do
-        true.should be_true
-      end
-    {% end %}
-  else
-    it "sizeof Package_s" do
       sizeof(RPM::LibRPM::Package_s).should eq(sz_pkg_s)
+
+      RPM::LibRPM::Package_s.offsetof(@header).should eq(CCheck.offset_package_s("header"))
+      RPM::LibRPM::Package_s.offsetof(@next).should eq(CCheck.offset_package_s("next"))
     end
   end
 
-  {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-    if sz_pkg_s != -1
-      it "offsetof members in Package_s" do
-        RPM::LibRPM::Package_s.offsetof(@header).should eq(CCheck.offset_package_s("header"))
-        RPM::LibRPM::Package_s.offsetof(@next).should eq(CCheck.offset_package_s("next"))
-      end
+  it "sizeof BuildArguments_s" do
+    sz_bta_s = CCheck.sizeof_buildarguments_s
+    case sz_bta_s
+    when -1
+      raise "compilation failed"
     else
-      pending "offsetof members in Package_s (compilation error)" do
-      end
-    end
-  {% end %}
-
-  sz_bta_s = CCheck.sizeof_buildarguments_s
-  case sz_bta_s
-  when -1
-    pending "sizoef BuildArguments_s (compilation error)" do
-    end
-
-    pending "offsetof members in BuildArguments_s (compilation error)" do
-    end
-  else
-    it "sizeof BuildArguments_s" do
-      sizeof(RPM::LibRPM::BuildArguments_s).should eq(sz_bta_s)
-    end
-
-    it "offsetof members in BuildArguments_s" do
       RPM::LibRPM::BuildArguments_s.offsetof(@rootdir).should eq(CCheck.offset_buildarguments_s("rootdir"))
       RPM::LibRPM::BuildArguments_s.offsetof(@build_amount).should eq(CCheck.offset_buildarguments_s("buildAmount"))
+
+      sizeof(RPM::LibRPM::BuildArguments_s).should eq(sz_bta_s)
     end
   end
 
-  describe "sample specfile" do
-    spec = RPM::Spec.open(fixture("a.spec"))
-
-    it "#buildroot" do
-      buildroot = RPM["buildroot"]
-      buildroot = buildroot.sub(/%{name}/i, "a")
-      buildroot = buildroot.sub(/%{version}/i, "1.0")
-      buildroot = buildroot.sub(/%{release}/i, "0")
+  describe "#buildroot" do
+    it "reflects %{buildroot}" do
+      buildroot = "/buildroot"
+      RPM["buildroot"] = buildroot
+      spec = RPM::Spec.open(fixture("a.spec"))
       spec.buildroot.should eq(buildroot)
     end
+  end
 
-    it "#packages" do
+  describe "#package" do
+    it "returns packages defined in the specfile" do
+      spec = RPM::Spec.open(fixture("a.spec"))
       pkgs = spec.packages
       pkg_names = pkgs.map { |x| x[RPM::Tag::Name].as(String) }
       pkg_names.sort.should eq(["a", "a-devel"])
     end
+  end
 
-    it "#sources" do
+  describe "#sources" do
+    it "returns sources defined in the specfile" do
+      spec = RPM::Spec.open(fixture("a.spec"))
       srcs = spec.sources
-      srcs.size.should eq(1)
-      src = srcs.find { |x| x.fullname == "a-1.0.tar.gz" }
-      src.class.should eq(RPM::Source)
-      if src
-        src.number.should eq(0)
-        src.no?.should be_false
-      end
+      srcs.sort_by! { |x| x.number }
+      sources = srcs.map { |x| {x.number, x.fullname, x.no?} }
+      sources.should eq([{0, "a-1.0.tar.gz", false}])
     end
+  end
 
+  describe "#buildrequires" do
     it "#buildrequires" do
+      spec = RPM::Spec.open(fixture("a.spec"))
       reqs = spec.buildrequires
       reqs.any? { |x| x.name == "c" }.should be_true
       reqs.any? { |x| x.name == "d" }.should be_true
     end
+  end
 
+  describe "#buildconflicts" do
     it "#buildconflicts" do
+      spec = RPM::Spec.open(fixture("a.spec"))
       cfts = spec.buildconflicts
       cfts.any? { |x| x.name == "e" }.should be_true
       cfts.any? { |x| x.name == "f" }.should be_true
     end
   end
 
-  describe "build spec" do
-    it "#builds" do
+  describe "#build" do
+    it "can build a package successfully" do
       oldhome = ENV["HOME"]
-      if false
-        rootdir = File.join(Dir.current, "root")
-        homedir = File.join(rootdir, "home")
-      else
-        rootdir = "/"
-        homedir = File.join(Dir.current, "root", "home")
-      end
-      rpmbuild = File.join(homedir, "rpmbuild")
       begin
-        ENV["HOME"] = homedir
-        Dir.mkdir_p(rpmbuild)
-        Dir.cd(rpmbuild) do
-          %w[BUILD RPMS SRPMS BUILDROOT SPECS].each do |d|
-            Dir.mkdir_p(d)
+        Dir.mktmpdir do |tmpdir|
+          rootdir = "/"
+          homedir = File.join(tmpdir, "home")
+          rpmbuild = File.join(homedir, "rpmbuild")
+          buildroot = File.join(tmpdir, "buildroot")
+
+          ENV["HOME"] = homedir
+          Dir.mkdir_p(rpmbuild)
+          Dir.cd(rpmbuild) do
+            %w[BUILD RPMS SRPMS BUILDROOT SPECS].each do |d|
+              Dir.mkdir_p(d)
+            end
           end
+          # Re-evaluate rpm macros.
+          RPM.read_config_files
+          spec = RPM::Spec.open(fixture("simple.spec"),
+            buildroot: buildroot, rootdir: nil)
+          amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CLEAN,
+            PACKAGESOURCE, PACKAGEBINARY, RMSOURCE, RMBUILD)
+          spec.build(build_amount: amount).should be_true
         end
-        # Re-evaluate rpm macros.
-        RPM.read_config_files
-        spec = RPM::Spec.open(fixture("simple.spec"),
-          buildroot: nil, rootdir: rootdir)
-        amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CLEAN,
-          PACKAGESOURCE, PACKAGEBINARY,
-          RMSOURCE, RMBUILD)
-        spec.build(build_amount: amount).should be_true
       ensure
         ENV["HOME"] = oldhome
       end
@@ -972,7 +1280,6 @@ describe "Files" do
       end
     end
   {% else %}
-    pending "should not be opened (Add `-Ddo_openfile_test` to run)" do
-    end
+    pending "should not be opened (Add `-Ddo_openfile_test` to run)"
   {% end %}
 end

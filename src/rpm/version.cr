@@ -75,9 +75,11 @@ module RPM
     end
 
     def hash
-      h = @e.nil? ? 0_u64 : @e.as(Int).to_u64
+      e = @e
+      h = e ? e.to_u64 : 0_u64
       h = (h << 1) ^ @r.hash
       h = (h << 1) ^ @v.hash
+      h
     end
   end
 end
