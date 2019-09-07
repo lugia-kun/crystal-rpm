@@ -32,7 +32,7 @@ module RPM
       rc = LibRPM.rpmtsCheck(@ptr)
       raise Exception.new("RPM: Failed to check transaction") if rc != 0
 
-      ptr = LibRPM.rpmtsProblems(ts.ptr)
+      ptr = LibRPM.rpmtsProblems(@ptr)
       ProblemSet.new(ptr)
     end
 
@@ -281,7 +281,7 @@ module RPM
           msg = String.new(LibRPM.rpmlogMessage)
           raise Exception.new(msg)
         elsif rc > 0
-          ps = ProblemSet.new(self)
+          ps = self.check
           ps.each do |problem|
             STDERR.puts problem.to_s
           end

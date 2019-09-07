@@ -896,15 +896,14 @@ describe RPM::Transaction do
           install_simple(package: file, root: tmproot)
           path = fixture(file)
           pkg = RPM::Package.open(path)
-          RPM.transaction do |ts|
+          RPM.transaction(tmproot) do |ts|
             ts.install(pkg, path)
             ts.order
             ts.clean
             ts.commit.should_not eq(0)
 
             probs = ts.check
-            set = probs.map { |x| { x.type, x.key, x.str } }.to_set
-            p set
+            probs.each.find { |x| x.type == RPM::ProblemType::PKG_INSTALLED }.should_not be_nil
           end
         end
       ensure
