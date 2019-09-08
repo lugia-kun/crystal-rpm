@@ -19,11 +19,11 @@ Paquete de muestra
 %prep
 
 %build
+
+%install
 mkdir -p %{buildroot}%{_datadir}/%{name}
 echo "Hello" > %{buildroot}%{_datadir}/%{name}/README
 echo "Hola" > %{buildroot}%{_datadir}/%{name}/README.es
-
-%install
 
 %clean
 %{?buildroot:%__rm -rf "%{buildroot}"}
