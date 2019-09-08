@@ -192,6 +192,7 @@ module RPM
       property transaction : Transaction
       property callback : Callback
       property fdt : FileDescriptor?
+      property cfd : IO::FileDescriptor?
 
       def initialize(@transaction, @callback)
       end
@@ -233,24 +234,21 @@ module RPM
           when CallbackType::INST_OPEN_FILE
             case ret
             when IO::FileDescriptor
-              ino = ret.as(IO::FileDescriptor).fd
+              ino = ret.fd
+              boxed.cfd = ret
             when Int32
-              ino = ret.as(Int32)
+              ino = ret
             else
-              {% if compare_versions(RPM::PKGVERSION_COMP, "4.14.0") < 0 %}
-                fname = key.as(Pointer(UInt8))
-                begin
-                  filename = String.new(fname)
-                  fp = ::File.open(filename, "r")
-                  ino = fp.fd
-                rescue e : Exception
-                  STDERR.puts e.message
-                  return Pointer(Void).null
-                end
-              {% else %}
-                # It runs default actions.
+              fname = key.as(Pointer(UInt8))
+              begin
+                filename = String.new(fname)
+                fp = ::File.open(filename, "r")
+                boxed.cfd = fp
+                ino = fp.fd
+              rescue e : Exception
+                STDERR.puts e.message
                 return Pointer(Void).null
-              {% end %}
+              end
             end
             fdt = FileDescriptor.for_fd(ino)
             boxed.fdt = fdt
@@ -259,6 +257,9 @@ module RPM
             if boxed.fdt
               fd = boxed.fdt.as(FileDescriptor)
               fd.close
+              if (cfd = boxed.cfd)
+                cfd.close
+              end
             end
             Pointer(Void).null
           else

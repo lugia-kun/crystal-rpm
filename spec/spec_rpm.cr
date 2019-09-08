@@ -848,14 +848,27 @@ describe RPM::Transaction do
         end
         r.close
         stat.exit_code.should eq(0)
+        # We think the number of INST_PROGRESS's is not constant.
         expect =
-          {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-            # We do not think there are always 3 INST_PROGRESS's.
-            ["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE", "INST_START", "INST_PROGRESS", "INST_PROGRESS", "INST_PROGRESS", "INST_CLOSE_FILE"]
-          {% elsif compare_versions(RPM::PKGVERSION_COMP, "4.14.2") < 0 %}
-            ["INST_OPEN_FILE", "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"]
-          {% else %}
-            ["VERIFY_START", "VERIFY_PROGRESS", "INST_OPEN_FILE", "VERIFY_STOP", "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"]
+          {% begin %}
+            [
+            {% if compare_versions(RPM::PKGVERSION_COMP, "4.14.2") >= 0 %}
+              "VERIFY_START", "VERIFY_PROGRESS", "INST_OPEN_FILE",
+              "INST_CLOSE_FILE", "VERIFY_STOP",
+            {% end %}
+              "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE",
+            {% if (compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 &&
+                    compare_versions(RPM::PKGVERSION_COMP, "4.12.0") < 0) ||
+                    (compare_versions(RPM::PKGVERSION_COMP, "4.13.0") >= 0) %}
+              # I'm not sure why fc22 (4.12.1) does not evaluate this.
+              "ELEM_PROGRESS",
+            {% end %}
+              "INST_START", "INST_PROGRESS",  "INST_PROGRESS",  "INST_PROGRESS",
+            {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 %}
+              "INST_PROGRESS",
+            {% end %}
+              "INST_STOP", "INST_CLOSE_FILE",
+            ]
           {% end %}
         arr.should eq(expect)
       end
