@@ -1,65 +1,10 @@
 require "./spec_helper"
 require "tempdir"
 
-puts "Using RPM version #{RPM::PKGVERSION}"
-
-describe "helper" do
-  describe "#rpm" do
-    it "runs rpm" do
-      rpm("--version")
-    end
-
-    it "raises RPMCLIExceptionFailed on failure" do
-      expect_raises(RPMCLIExectionFailed) do
-        rpm("-i", ".", output: Process::Redirect::Close, error: Process::Redirect::Close)
-      end
-    end
-
-    it "sets $? (without block)" do
-      rpm("--version")
-      $?.exit_code.should eq(0)
-    end
-
-    it "sets $? (with block)" do
-      # Wrong argument is intentional.
-      rpm("--vers", raise_on_failure: false, error: Process::Redirect::Pipe) do |x|
-        x.error.gets_to_end.should match(/unknown option/)
-      end
-      $?.success?.should be_false
-    end
-  end
-
-  describe "#is_chroot_possible?" do
-    it "should return true (unless some tests will be skipped)" do
-      is_chroot_possible?.should be_true
-    end
-  end
-
-  describe "#install_simple" do
-    it "installs simple" do
-      Dir.mktmpdir do |root|
-        install_simple(root: root)
-      end
-    end
-
-    it "installs simple_with_deps (implicit --nodeps)" do
-      Dir.mktmpdir do |root|
-        install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: root)
-      end
-    end
-
-    it "fails when attempted to install to \"/\"" do
-      expect_raises(Exception) do
-        install_simple(root: "/")
-      end
-    end
-  end
-end
-
 describe RPM do
   it "should be compiled with a same version to CLI" do
     # output may be localized.
-    "RPM version #{RPM::PKGVERSION}".should eq(`env LANG=C rpm --version`.chomp)
+    "RPM version #{RPM::PKGVERSION}".should eq(`env LC_ALL=C rpm --version`.chomp)
   end
 
   it "has a VERSION matches obtained from pkg-config" do
@@ -842,13 +787,20 @@ describe RPM::Transaction do
 
   describe "#install" do
     it "installs simple package" do
-      path = fixture("simple-1.0-0.i586.rpm")
-      pkg = RPM::Package.open(path)
+      # RPM 4.8 has a bug that root directory is not set properly.
+      # So we need to run in fresh environment.
       Dir.mktmpdir do |tmproot|
-        RPM.transaction(tmproot) do |ts|
-          ts.install(pkg, path)
-          ts.commit
+        path = fixture("simple-1.0-0.i586.rpm")
+        stat = run_in_subproc(path, tmproot) do
+          path = ARGV[0]
+          tmproot = ARGV[1]
+          pkg = RPM::Package.open(path)
+          RPM.transaction(tmproot) do |ts|
+            ts.install(pkg, path)
+            ts.commit
+          end
         end
+        stat.exit_code.should eq(0)
         test_path = File.join(tmproot, "usr/share/simple/README")
         File.exists?(test_path).should be_true
       end
@@ -857,33 +809,46 @@ describe RPM::Transaction do
 
   describe "#callback" do
     it "runs expectations in the block" do
+      # RPM 4.8 has a bug that root directory is not set properly.
+      # So we need to run in fresh environment.
       path = fixture("simple-1.0-0.i586.rpm")
-      pkg = RPM::Package.open(path)
       Dir.mktmpdir do |tmproot|
-        # Create some missing directories which are not handled by #install.
-        install_simple(root: tmproot)
-        rpm("-e", "-r", tmproot, "simple")
-
-        RPM.transaction(tmproot) do |ts|
-          ts.install(pkg, path)
-          types = [] of RPM::CallbackType
-          ts.commit do |pkg, type|
-            case type
-            when RPM::CallbackType::TRANS_PROGRESS,
-                 RPM::CallbackType::TRANS_START,
-                 RPM::CallbackType::TRANS_STOP
-              pkg.should be_nil
-            else
-              # other values are ignored.
+        r, w = IO.pipe
+        stat = run_in_subproc(path, tmproot, output: w) do
+          pkg = RPM::Package.open(path)
+          pstat = true
+          RPM.transaction(tmproot) do |ts|
+            ts.install(pkg, path)
+            types = [] of RPM::CallbackType
+            ts.commit do |pkg, type|
+              case type
+              when RPM::CallbackType::TRANS_PROGRESS,
+                   RPM::CallbackType::TRANS_START,
+                   RPM::CallbackType::TRANS_STOP
+                if ! pkg.nil?
+                  pstat = false
+                end
+              else
+                # other values are ignored.
+              end
+              types << type
+              nil
             end
-            types << type
-            nil
-          end
 
-          types[-3..-1].should eq([RPM::CallbackType::TRANS_START,
-                                   RPM::CallbackType::TRANS_PROGRESS,
-                                   RPM::CallbackType::TRANS_STOP])
+            types.each do |t|
+              puts t
+            end
+          end
+          exit pstat ? 0 : 1
         end
+        w.close
+        arr = [] of String
+        while (output = r.gets(chomp: true))
+          arr << output
+        end
+        r.close
+        stat.exit_code.should eq(0)
+        arr[-3..-1].should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"])
       end
     end
   end
@@ -892,26 +857,34 @@ describe RPM::Transaction do
     it "collects problems" do
       # Dependencies are NOT checked here, so we need to generate
       # another problem here.
-      oldlang = ENV["LANG"]?
-      begin
-        ENV["LANG"] = "C"
-        Dir.mktmpdir do |tmproot|
-          file = "simple-1.0-0.i586.rpm"
-          install_simple(package: file, root: tmproot)
-          path = fixture(file)
+      #
+      # RPM 4.8 has a bug that root directory is not set properly.
+      # So we need to run in fresh environment.
+      Dir.mktmpdir do |tmproot|
+        file = "simple-1.0-0.i586.rpm"
+        install_simple(package: file, root: tmproot)
+        path = fixture(file)
+        r, w = IO.pipe
+        stat = run_in_subproc(tmproot, path, error: Process::Redirect::Close, output: w) do
+          ENV["LC_ALL"] = "C"
+          ret = false
           pkg = RPM::Package.open(path)
           RPM.transaction(tmproot) do |ts|
             ts.install(pkg, path)
             ts.order
             ts.clean
-            ts.commit.should_not eq(0)
+            ret = (ts.commit != 0)
 
             probs = ts.check
-            probs.each.find { |x| x.type == RPM::ProblemType::PKG_INSTALLED }.should_not be_nil
+            probs.each { |x| puts x.to_s }
           end
+          exit (ret ? 0 : 1)
         end
-      ensure
-        ENV["LANG"] = oldlang
+        w.close
+        output = r.gets_to_end
+        r.close
+        stat.exit_code.should eq(0)
+        output.should match(/^package simple-1\.0-0\.i586 is already installed$/)
       end
     end
   end
@@ -919,38 +892,44 @@ describe RPM::Transaction do
   describe "#delete" do
     # TODO: RPM in OpenSUSE works with this semantic, but not in
     # others. This must be investigated...
+    #
+    # RPM 4.8 has a bug that root directory is not set properly.
+    # So we need to run in fresh environment.
     {% if flag?("do_remove_test") %}
       it "removes a pacakge" do
         Dir.mktmpdir do |tmproot|
           install_simple(root: tmproot)
           install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: tmproot)
-          RPM.transaction(tmproot) do |ts|
-            iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
-            removed = [] of RPM::Package
-            iter.each do |pkg|
-              if pkg[RPM::Tag::Version].as(String) == "1.0" &&
-                 pkg[RPM::Tag::Release].as(String) == "0" &&
-                 pkg[RPM::Tag::Arch].as(String) == "i586"
-                ts.delete(pkg)
-                removed << pkg
+          stat = run_in_subproc(tmproot) do
+            RPM.transaction(tmproot) do |ts|
+              iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
+              removed = [] of RPM::Package
+              iter.each do |pkg|
+                if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+                   pkg[RPM::Tag::Release].as(String) == "0" &&
+                   pkg[RPM::Tag::Arch].as(String) == "i586"
+                  ts.delete(pkg)
+                  removed << pkg
+                end
               end
-            end
-            if removed.empty?
-              raise Exception.new("No packages found to remove!")
-            end
-            ts.order
+              if removed.empty?
+                raise Exception.new("No packages found to remove!")
+              end
+              ts.order
 
-            probs = ts.check
-            bad = false
-            probs.each do |prob|
-              bad = true
+              probs = ts.check
+              bad = false
+              probs.each do |prob|
+                bad = true
               STDERR.puts prob.to_s
-            end
-            raise Exception.new("Transaction has problem") if bad
+              end
+              raise Exception.new("Transaction has problem") if bad
 
-            ts.clean
-            ts.commit
+              ts.clean
+              ts.commit
+            end
           end
+          stat.exit_code.should eq(0)
           test_path = File.join(tmproot, "usr/share/simple/README")
           File.exists?(test_path).should be_false
         end
@@ -1221,9 +1200,10 @@ describe RPM::Spec do
 
   describe "#build" do
     it "can build a package successfully" do
-      oldhome = ENV["HOME"]
-      begin
-        Dir.mktmpdir do |tmpdir|
+      # Use fresh environment for build a spec.
+      Dir.mktmpdir do |tmpdir|
+        specfile = fixture("simple.spec")
+        stat = run_in_subproc(specfile, tmpdir) do
           rootdir = "/"
           homedir = File.join(tmpdir, "home")
           rpmbuild = File.join(homedir, "rpmbuild")
@@ -1238,14 +1218,13 @@ describe RPM::Spec do
           end
           # Re-evaluate rpm macros.
           RPM.read_config_files
-          spec = RPM::Spec.open(fixture("simple.spec"),
-            buildroot: buildroot, rootdir: nil)
+          spec = RPM::Spec.open(specfile, buildroot: buildroot, rootdir: nil)
           amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CLEAN,
             PACKAGESOURCE, PACKAGEBINARY, RMSOURCE, RMBUILD)
-          spec.build(build_amount: amount).should be_true
+          ret = spec.build(build_amount: amount)
+          exit (ret ? 0 : 1)
         end
-      ensure
-        ENV["HOME"] = oldhome
+        stat.exit_code.should eq(0)
       end
     end
   end

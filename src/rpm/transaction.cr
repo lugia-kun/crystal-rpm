@@ -316,9 +316,8 @@ module RPM
   end
 
   def self.transaction(root = "/", &block)
-    ts = Transaction.new
+    ts = Transaction.new(root: root)
     begin
-      ts.root_dir = root
       yield ts
     ensure
       ts.close_db
