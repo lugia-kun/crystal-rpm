@@ -865,9 +865,9 @@ describe RPM::Transaction do
             {% end %}
               "INST_START", "INST_PROGRESS",  "INST_PROGRESS",  "INST_PROGRESS",
             {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 %}
-              "INST_PROGRESS",
+              "INST_PROGRESS", "INST_STOP",
             {% end %}
-              "INST_STOP", "INST_CLOSE_FILE",
+              "INST_CLOSE_FILE",
             ]
           {% end %}
         arr.should eq(expect)
