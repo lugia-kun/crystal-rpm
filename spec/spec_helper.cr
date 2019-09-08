@@ -272,7 +272,7 @@ def install_simple(*, root : String, package : String = "simple-1.0-0.i586.rpm")
   nil
 end
 
-ORIGINAL_DIR = Dir.current
+ORIGINAL_DIR = File.dirname(__FILE__)
 
 # Run small Crystal program as an external program
 macro run_in_subproc(*args, **opts, &block)
@@ -280,7 +280,7 @@ macro run_in_subproc(*args, **opts, &block)
     %script = File.tempfile("run", ".cr", dir: ORIGINAL_DIR)
     begin
       %script.print <<-EOF
-require "./src/rpm"
+require "../src/rpm"
 
 {% begin %}
 {% i = 0 %}
