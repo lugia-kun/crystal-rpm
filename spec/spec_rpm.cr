@@ -856,11 +856,15 @@ describe RPM::Transaction do
               "VERIFY_START", "VERIFY_PROGRESS", "INST_OPEN_FILE",
               "INST_CLOSE_FILE", "VERIFY_STOP",
             {% end %}
-              "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE",
+              "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP",
+            {% if compare_versions(RPM::PKGVERSION_COMP, "4.13.0") == 0 %}
+              "ELEM_PROGRESS",
+            {% end %}
+              "INST_OPEN_FILE",
             {% if (compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 &&
                     compare_versions(RPM::PKGVERSION_COMP, "4.12.0") < 0) ||
-                    (compare_versions(RPM::PKGVERSION_COMP, "4.13.0") >= 0) %}
-              # I'm not sure why fc22 (4.12.1) does not evaluate this.
+                    (compare_versions(RPM::PKGVERSION_COMP, "4.13.1") >= 0) %}
+              # I'm not sure why fc22 (4.12.0) does not evaluate this.
               "ELEM_PROGRESS",
             {% end %}
               "INST_START", "INST_PROGRESS",  "INST_PROGRESS",  "INST_PROGRESS",
