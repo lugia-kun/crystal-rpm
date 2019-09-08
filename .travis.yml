@@ -24,7 +24,6 @@ env:
   - RPMVERSION=rpm-4.13.1
   - RPMVERSION=rpm-4.14.1
   - RPMVERSION=rpm-4.14.2.1
-  - RPMVERSION=fc22
   - RPMVERSION=opensuse # OpenSUSE's rpm behave differently...
 
 before_install:
