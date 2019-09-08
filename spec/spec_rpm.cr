@@ -871,6 +871,8 @@ describe RPM::Transaction do
             ]
           {% end %}
         arr.should eq(expect)
+        test_path = File.join(tmproot, "usr/share/simple/README")
+        File.exists?(test_path).should be_true
       end
     end
   end
