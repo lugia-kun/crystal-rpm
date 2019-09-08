@@ -234,7 +234,20 @@ module RPM
             when Int32
               ino = ret.as(Int32)
             else
-              return Pointer(Void).null
+              {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+                fname = key.as(Pointer(UInt8))
+                begin
+                  filename = String.new(fname)
+                  fp = ::File.open(filename, "r")
+                  ino = fp.fd
+                rescue e : Exception
+                  STDERR.puts e.message
+                  return Pointer(Void).null
+                end
+              {% else %}
+                # It runs default actions.
+                return Pointer(Void).null
+              {% end %}
             end
             fdt = FileDescriptor.for_fd(ino)
             boxed.fdt = fdt

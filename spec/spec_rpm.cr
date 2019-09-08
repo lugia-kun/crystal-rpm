@@ -848,7 +848,12 @@ describe RPM::Transaction do
         end
         r.close
         stat.exit_code.should eq(0)
-        arr[-3..-1].should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"])
+        {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+          # We do not think there are always 3 INST_PROGRESS's.
+          arr.should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE", "INST_START", "INST_PROGRESS", "INST_PROGRESS", "INST_PROGRESS", "INST_CLOSE_FILE"])
+        {% else %}
+          arr.should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"])
+        {% end %}
       end
     end
   end
@@ -865,7 +870,7 @@ describe RPM::Transaction do
         install_simple(package: file, root: tmproot)
         path = fixture(file)
         r, w = IO.pipe
-        stat = run_in_subproc(tmproot, path, error: Process::Redirect::Close, output: w) do
+        stat = run_in_subproc(tmproot, path, error: Process::Redirect::Inherit, output: w) do
           ENV["LC_ALL"] = "C"
           ret = false
           pkg = RPM::Package.open(path)
