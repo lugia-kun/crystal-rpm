@@ -9,8 +9,7 @@ module RPM
   RPMVERSION = String.new(LibRPM.rpmversion)
 
   # Calculate version code.
-  #
-  # Recommend use `RPMVERSION` directly.
+  @[Deprecated("Use `RPMVERSION`")]
   def self.rpm_version_code : UInt32
     maj, min, pat = RPMVERSION.split(".")
     (maj.to_u32 << 16) + (min.to_u32 << 8) + (pat.to_u32)
