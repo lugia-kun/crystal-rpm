@@ -1,0 +1,4 @@
+FROM fedora:22 AS rpm-4.12.0
+RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
+RUN dnf install -y rpm-build rpm-devel crystal which --disablerepo updates
+WORKDIR /work
