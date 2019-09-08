@@ -825,7 +825,7 @@ describe RPM::Transaction do
               when RPM::CallbackType::TRANS_PROGRESS,
                    RPM::CallbackType::TRANS_START,
                    RPM::CallbackType::TRANS_STOP
-                if ! pkg.nil?
+                if !pkg.nil?
                   pstat = false
                 end
               else
@@ -848,12 +848,16 @@ describe RPM::Transaction do
         end
         r.close
         stat.exit_code.should eq(0)
-        {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
-          # We do not think there are always 3 INST_PROGRESS's.
-          arr.should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE", "INST_START", "INST_PROGRESS", "INST_PROGRESS", "INST_PROGRESS", "INST_CLOSE_FILE"])
-        {% else %}
-          arr.should eq(["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"])
-        {% end %}
+        expect =
+          {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+            # We do not think there are always 3 INST_PROGRESS's.
+            ["TRANS_START", "TRANS_PROGRESS", "TRANS_STOP", "INST_OPEN_FILE", "INST_START", "INST_PROGRESS", "INST_PROGRESS", "INST_PROGRESS", "INST_CLOSE_FILE"]
+          {% elsif compare_versions(RPM::PKGVERSION_COMP, "4.14.2") < 0 %}
+            ["INST_OPEN_FILE", "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"]
+          {% else %}
+            ["VERIFY_START", "VERIFY_PROGRESS", "INST_OPEN_FILE", "VERIFY_STOP", "TRANS_START", "TRANS_PROGRESS", "TRANS_STOP"]
+          {% end %}
+        arr.should eq(expect)
       end
     end
   end
@@ -926,7 +930,7 @@ describe RPM::Transaction do
               bad = false
               probs.each do |prob|
                 bad = true
-              STDERR.puts prob.to_s
+                STDERR.puts prob.to_s
               end
               raise Exception.new("Transaction has problem") if bad
 

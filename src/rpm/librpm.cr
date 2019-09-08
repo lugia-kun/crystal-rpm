@@ -276,6 +276,9 @@ module RPM
       SCRIPT_STOP        = (1_u32 << 17)
       INST_STOP          = (1_u32 << 18)
       ELEM_PROGRESS      = (1_u32 << 19)
+      VERIFY_PROGRESS    = (1_u32 << 20)
+      VERIFY_START       = (1_u32 << 21)
+      VERIFY_STOP        = (1_u32 << 22)
     end
 
     alias CallbackData = Pointer(Void)

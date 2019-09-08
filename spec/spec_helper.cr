@@ -307,7 +307,7 @@ EOF
   end
 end
 
-## Spec of helper
+# # Spec of helper
 describe "helper" do
   describe "#rpm" do
     it "runs rpm" do

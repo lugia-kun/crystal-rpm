@@ -209,9 +209,12 @@ module RPM
     # end
     # ```
     #
-    # NOTE: We notifies `rpmtsRun` (`#commit`) may raises an Exception
+    # WARNING: We notifies `rpmtsRun` (`#commit`) may raises an Exception
     # to the compiler, but raising an exception is highly discouraged.
     # It may break the RPM database.
+    #
+    # WARNING: Call order (by type) and content of arguments are very
+    # different by RPM version.
     def set_notify_callback(closure : Callback?, &block)
       if closure
         box_data = CallbackBoxData.new(self, closure)
@@ -234,7 +237,7 @@ module RPM
             when Int32
               ino = ret.as(Int32)
             else
-              {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+              {% if compare_versions(RPM::PKGVERSION_COMP, "4.14.0") < 0 %}
                 fname = key.as(Pointer(UInt8))
                 begin
                   filename = String.new(fname)
@@ -323,6 +326,8 @@ module RPM
     # end
     # ```
     #
+    # WARNING: Call order (by type) and content of arguments are very
+    # different by RPM version.
     def commit(&block : Callback)
       commit(block)
     end
