@@ -1,7 +1,9 @@
 # crystal-rpm
 
-The [RPM] bindings for [Crystal] language based on [ruby-rpm] and
-[ruby-rpm-ffi].
+The [RPM](http://rpm.org/) bindings for
+[Crystal](https://crystal-lang.org/) language based on
+[ruby-rpm](https://github.com/dmacvicar/ruby-rpm) and
+[ruby-rpm-ffi](https://github.com/dmacvicar/ruby-rpm-ffi).
 
 It supports RPM 4.8.0 or later.
 
@@ -58,40 +60,58 @@ end
 ```crystal
 # with given name
 RPM.transaction do |ts|
-  iter - ts.init_iterator(RPM::DbiTag::Name, "package-name-to-find")
-  iter.each do |pkg|
-    # Iterator over matching packages.
+  iter = ts.init_iterator(RPM::DbiTag::Name, "package-name-to-find")
+  
+  # You should make sure iterator has finalized (for closing database)
+  begin
+    iter.each do |pkg|
+      # Iterator over matching packages.
+    end
+  ensure
+    iter.finalize
   end
 end
 
 # with given regexp
 RPM.transaction do |ts|
   iter = ts.init_iterator   # Create iterator of installed packages
-  
-  # Set condition
-  iter.regexp(RPM::DbiTag::Name, # <= Entry to search (here, Name)
-              RPM::MireMode::REGEX, # <= Default matching method
-              "simple.*") #  <= Name to search
 
-  # Iterate over matching packages.
-  iter.each do |pkg|
-    puts pkg[RPM::Tag::Version].as(String) # => (Version of package "simple")
+  begin
+    # Set condition
+    iter.regexp(RPM::DbiTag::Name, # <= Entry to search (here, Name)
+                RPM::MireMode::REGEX, # <= Default matching method
+                "simple.*") #  <= Name to search
+    
+    # Iterate over matching packages.
+    iter.each do |pkg|
+      puts pkg[RPM::Tag::Version].as(String) # => (Version of package "simple")
+    end
+  ensure
+    iter.finalize
   end
 end
 
 # Iterate over all installed packages
 RPM.transaction do |ts|
   iter = ts.init_iterator
-  iter.each do |pkg|
-    # ... iterates over all installed packages.
+  begin
+    iter.each do |pkg|
+      # ... iterates over all installed packages.
+    end
+  ensure
+    iter.finalize
   end
 end
 
 # Lookup package(s) which contains a specific file
 RPM.transaction do |ts|
   iter = ts.init_iterator(RPM::DbiTag::BaseNames, "/path/to/lookup")
-  iter.each do |pkg|
-    # ... iterates over packages contains "/path/to/lookup"
+  begin
+    iter.each do |pkg|
+      # ... iterates over packages contains "/path/to/lookup"
+    end
+  ensure
+    iter.finalize
   end
 end
 
@@ -99,9 +119,13 @@ end
 # contain a file whose basename is the given name.
 RPM.transaction do |ts|
   iter = ts.init_iterator
-  iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, "README")
-  iter.each do |pkg|
-    # ... iterates over packages which contain a file named "README"
+  begin
+    iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, "README")
+    iter.each do |pkg|
+      # ... iterates over packages which contain a file named "README"
+    end
+  ensure
+    iter.finalize
   end
 end
 ```
@@ -143,9 +167,11 @@ RPM.transation do |ts|
   ts.install(...)
   ts.order
   ts.clean
-  problems = ts.check
-  problems.each do |problem|
-    puts problem.to_s # => Output install (typically dependency) problems.
+  ts.check
+  if (problems = ts.problems?)
+    problems.each do |problem|
+      puts problem.to_s # => Output install (typically dependency) problems.
+    end
   end
 end
 ```
@@ -162,7 +188,7 @@ packages[1][RPM::Tag::Name] # => (Name of the second package)
 spec.buildrequires # => Array of BuildRequires.
 ```
 
-### Build RPM (not yet available)
+### Build RPM
 
 ```crystal
 spec = RPM::Spec.open("foo.spec")
@@ -171,11 +197,12 @@ spec.build
 
 ## Development
 
-The definitiions of structs are written by hand. Tests can check their
+The definitions of structs are written by hand. Tests can check their
 size and member offsets if you have a C compiler (optional).
 
-[fakechroot] (recommended) or root permission (i.e., `sudo`) is
-required to run `crystal spec`, since this spec uses `chroot()`.
+[fakechroot](https://github.com/dex4er/fakechroot/wiki) (recommended)
+or root permission (i.e., `sudo`) is required to run `crystal spec`,
+since this spec uses `chroot()`.
 
 Alternatively, using Docker is another method to test:
 
@@ -199,9 +226,3 @@ is too old and does not work with shards).
 ## Contributors
 
 - [Hajime Yoshimori](https://github.com/lugia-kun) - creator and maintainer
-
-[RPM]: http://rpm.org/
-[Crystal]: https://crystal-lang.org/
-[ruby-rpm]: https://github.com/dmacvicar/ruby-rpm
-[ruby-rpm-ffi]: https://github.com/dmacvicar/ruby-rpm-ffi
-[fakechroot]: https://github.com/dex4er/fakechroot/wiki
