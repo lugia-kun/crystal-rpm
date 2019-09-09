@@ -1,4 +1,7 @@
 module RPM
+  class TransactionError < Exception
+  end
+
   # Handles RPM transaction. Any RPM Database work must be accessed
   # via the Transaction.
   class Transaction
@@ -25,15 +28,24 @@ module RPM
 
     # Run transaction check
     #
-    # Returns a ProblemSet with found problem.
-    #
     # Raises exception if check errored.
     def check
       rc = LibRPM.rpmtsCheck(@ptr)
-      raise Exception.new("RPM: Failed to check transaction") if rc != 0
+      raise TransactionError.new("RPM: Failed to check transaction") if rc != 0
+      true
+    end
 
+    # Return transaction problems
+    #
+    # If there are no problems, returns nil.
+    def problems?
       ptr = LibRPM.rpmtsProblems(@ptr)
-      ProblemSet.new(ptr)
+      if LibRPM.rpmpsNumProblems(ptr) == 0
+        LibRPM.rpmpsFree(ptr)
+        nil
+      else
+        ProblemSet.new(ptr)
+      end
     end
 
     # Create a new package iterator with given `tag` and `val`
@@ -93,7 +105,7 @@ module RPM
     def delete_by_iterator(iter : MatchIterator)
       iter.each do |header|
         ret = LibRPM.rpmtsAddEraseElement(@ptr, header.hdr, iter.offset)
-        raise Exception.new("Error while adding erase to transaction") if ret != 0
+        raise TransactionError.new("Error while adding erase to transaction") if ret != 0
       end
     end
 
@@ -180,7 +192,7 @@ module RPM
       @keys << key
 
       ret = LibRPM.rpmtsAddInstallElement(@ptr, pkg.hdr, key, upgrade, nil)
-      raise Exception.new("Failed add install element") if ret != 0
+      raise TransactionError.new("Failed add install element") if ret != 0
       nil
     end
 
@@ -287,8 +299,13 @@ module RPM
     # Run the pending transaction
     #
     # If callback is not given, default callback will be used.
+    #
+    # Returns true if transaction has been completed successfully,
+    # false if transaction has problem(s).
+    #
+    # Raises TransactionError if any error(s) occured
     def commit(callback : Callback? = nil)
-      rc = 1
+      rc = 0
       set_notify_callback(callback) do
         rc = LibRPM.rpmtsRun(@ptr, nil, LibRPM::ProbFilterFlags::NONE)
         if rc == 0
@@ -296,15 +313,10 @@ module RPM
           LibRPM.rpmtsEmpty(@ptr)
         elsif rc < 0
           msg = String.new(LibRPM.rpmlogMessage)
-          raise Exception.new(msg)
-        elsif rc > 0
-          ps = self.check
-          ps.each do |problem|
-            STDERR.puts problem.to_s
-          end
+          raise TransactionError.new(msg)
         end
       end
-      rc
+      rc == 0
     end
 
     # Run the pending transaction, with given callback.

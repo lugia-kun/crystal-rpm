@@ -883,37 +883,35 @@ describe RPM::Transaction do
 
   describe "#check" do
     it "collects problems" do
-      # Dependencies are NOT checked here, so we need to generate
-      # another problem here.
-      #
       # RPM 4.8 has a bug that root directory is not set properly.
       # So we need to run in fresh environment.
-      Dir.mktmpdir do |tmproot|
-        file = "simple-1.0-0.i586.rpm"
-        install_simple(package: file, root: tmproot)
-        path = fixture(file)
-        r, w = IO.pipe
-        stat = run_in_subproc(tmproot, path, error: Process::Redirect::Inherit, output: w) do
-          ENV["LC_ALL"] = "C"
-          ret = false
-          pkg = RPM::Package.open(path)
-          RPM.transaction(tmproot) do |ts|
-            ts.install(pkg, path)
-            ts.order
-            ts.clean
-            ret = (ts.commit != 0)
-
-            probs = ts.check
-            probs.each { |x| puts x.to_s }
+      file = "simple_with_deps-1.0-0.i586.rpm"
+      path = fixture(file)
+      r, w = IO.pipe
+      stat = run_in_subproc(path, error: Process::Redirect::Inherit, output: w) do
+        ENV["LC_ALL"] = "C"
+        pkg = RPM::Package.open(path)
+        RPM.transaction do |ts|
+          ts.install(pkg, path)
+          ts.check
+          if (check_probs = ts.problems?)
+            check_probs.each { |x| puts x.to_s }
           end
-          exit (ret ? 0 : 1)
         end
-        w.close
-        output = r.gets_to_end
-        r.close
-        stat.exit_code.should eq(0)
-        output.should match(/^package simple-1\.0-0\.i586 is already installed$/)
+        exit 0
       end
+      w.close
+      lines = [] of String
+      while (l = r.gets(chomp: true))
+        lines << l
+      end
+      r.close
+      stat.exit_code.should eq(0)
+      expected = [
+        "a is needed by simple_with_deps-1.0-0.i586",
+        "b > 1.0 is needed by simple_with_deps-1.0-0.i586",
+      ]
+      lines.sort.should eq(expected)
     end
   end
 
