@@ -487,13 +487,18 @@ describe RPM::Transaction do
         RPM.transaction do |ts|
           iter = ts.init_iterator
           begin
+            if first = iter.first?
+              first.name.should start_with("")
+            end
             iter.class.should eq(RPM::MatchIterator)
           ensure
             iter.finalize
           end
         end
       end
+    end
 
+    describe "#db_iterator" do
       # Base test
       it "looks for a package" do
         a_installed_pkg = nil
@@ -505,14 +510,11 @@ describe RPM::Transaction do
           root = "/"
         end
         RPM.transaction(root) do |ts|
-          iter = ts.init_iterator
-          begin
+          ts.db_iterator do |iter|
             a_installed_pkg = iter.first?
             if chroot
               a_installed_pkg.should_not be_nil
             end
-          ensure
-            iter.finalize
           end
         end
         if a_installed_pkg.nil?
@@ -538,12 +540,9 @@ describe RPM::Transaction do
           tmpdir = Dir.mktmpdir
           root = tmpdir.path
           RPM.transaction(root) do |ts|
-            iter = ts.init_iterator
-            begin
+            ts.db_iterator do |iter|
               a_installed_pkg = iter.first?
               a_installed_pkg.should be_nil
-            ensure
-              iter.finalize
             end
           end
         ensure
@@ -556,8 +555,7 @@ describe RPM::Transaction do
       it "looks for a package contains a file" do
         a_installed_pkg = nil
         RPM.transaction do |ts|
-          iter = ts.init_iterator
-          begin
+          ts.db_iterator do |iter|
             iter.each do |x|
               if (has_files = x[RPM::Tag::BaseNames]).is_a?(Array(String))
                 if has_files.size > 0
@@ -566,8 +564,6 @@ describe RPM::Transaction do
                 end
               end
             end
-          ensure
-            iter.finalize
           end
         end
         if a_installed_pkg.nil?
@@ -607,12 +603,9 @@ describe RPM::Transaction do
           raise "No package contains files (please run with fakechroot)"
         end
         RPM.transaction(root) do |ts|
-          iter = ts.init_iterator(RPM::DbiTag::BaseNames, target_file)
-          begin
+          ts.db_iterator(RPM::DbiTag::BaseNames, target_file) do |iter|
             a_installed_pkg = iter.map { |x| x[RPM::Tag::Name].as(String) }
             a_installed_pkg.sort!
-          ensure
-            iter.finalize
           end
         end
         a_installed_pkg.not_nil!
@@ -625,11 +618,8 @@ describe RPM::Transaction do
       it "looks for a package not found by name" do
         RPM.transaction do |ts|
           # NB: "......" is not valid RPM package name.
-          iter = ts.init_iterator(RPM::DbiTag::Name, "......")
-          begin
+          ts.db_iterator(RPM::DbiTag::Name, "......") do |iter|
             iter.to_a.should eq([] of RPM::Package)
-          ensure
-            iter.finalize
           end
         end
       end
@@ -639,11 +629,8 @@ describe RPM::Transaction do
           ret = rpm("-qf", tmpdir, raise_on_failure: false, error: Process::Redirect::Close)
           $?.exit_code.should_not eq(0)
           RPM.transaction do |ts|
-            iter = ts.init_iterator(RPM::DbiTag::BaseNames, tmpdir)
-            begin
+            ts.db_iterator(RPM::DbiTag::BaseNames, tmpdir) do |iter|
               iter.to_a.should eq([] of RPM::Package)
-            ensure
-              iter.finalize
             end
           end
         end
@@ -688,17 +675,14 @@ describe RPM::Transaction do
         a_version = a_version.not_nil!
 
         RPM.transaction(root) do |ts|
-          iter = ts.init_iterator
-          begin
+          pkgs = Set(Tuple(String, String)).new
+          ts.db_iterator do |iter|
             iter.version(RPM::Version.new(a_version))
-            pkgs = Set(Tuple(String, String)).new
             iter.each do |sig|
               pkgs << {sig.name, sig[RPM::Tag::Arch].as(String)}
             end
-            pkgs.should eq(names)
-          ensure
-            iter.finalize
           end
+          pkgs.should eq(names)
         end
       ensure
         if tmpdir
@@ -763,8 +747,7 @@ describe RPM::Transaction do
         pattern = pattern.not_nil!
 
         RPM.transaction(root) do |ts|
-          iter = ts.init_iterator
-          begin
+          ts.db_iterator do |iter|
             iter.regexp(RPM::DbiTag::Name, RPM::MireMode::GLOB, pattern)
             pkgs = Set(Tuple(String, String, String, UInt32?, String)).new
             iter.each do |pkg|
@@ -777,9 +760,11 @@ describe RPM::Transaction do
               pkgs << tup
             end
             pkgs.should eq(reference)
-          ensure
-            iter.finalize
           end
+        end
+      ensure
+        if tmpdir
+          tmpdir.close
         end
       end
     end
@@ -928,28 +913,29 @@ describe RPM::Transaction do
           install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: tmproot)
           stat = run_in_subproc(tmproot) do
             RPM.transaction(tmproot) do |ts|
-              iter = ts.init_iterator(RPM::DbiTag::Name, "simple")
               removed = [] of RPM::Package
-              iter.each do |pkg|
-                if pkg[RPM::Tag::Version].as(String) == "1.0" &&
-                   pkg[RPM::Tag::Release].as(String) == "0" &&
-                   pkg[RPM::Tag::Arch].as(String) == "i586"
-                  ts.delete(pkg)
-                  removed << pkg
+              ts.db_iterator(RPM::DbiTag::Name, "simple") do |iter|
+                iter.each do |pkg|
+                  if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+                     pkg[RPM::Tag::Release].as(String) == "0" &&
+                     pkg[RPM::Tag::Arch].as(String) == "i586"
+                    ts.delete(pkg)
+                    removed << pkg
+                  end
                 end
               end
               if removed.empty?
                 raise Exception.new("No packages found to remove!")
               end
-              ts.order
 
-              probs = ts.check
-              bad = false
-              probs.each do |prob|
-                bad = true
-                STDERR.puts prob.to_s
+              ts.order
+              ts.check
+              if (probs = ts.problems?)
+                probs.each do |prob|
+                  STDERR.puts prob.to_s
+                end
+                raise Exception.new("Transaction has problem")
               end
-              raise Exception.new("Transaction has problem") if bad
 
               ts.clean
               ts.commit

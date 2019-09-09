@@ -73,6 +73,27 @@ module RPM
       MatchIterator.new(it_ptr)
     end
 
+    # Init DB iterator, yield block and cleanup.
+    #
+    # Please refer RPM's `rpmtsInitIterator()` function for more
+    # details.
+    #
+    # Some examples are:
+    #
+    #  * For package tag lookup, use `RPM::DbiTag::Packages`.
+    #  * For package name lookup, use `RPM::DbiTag::Name`.
+    #  * For filename (fullpath) lookup, use `RPM::DbiTag::BaseNames`.
+    #  * To lookup by a specific tag, initialize iterator with
+    #    `RPM::DbiTag::Packages`, and use `#regexp` method.
+    def db_iterator(tag = DbiTag::Packages, val = nil, &block : MatchIterator -> _)
+      iter = init_iterator(tag, val)
+      begin
+        yield iter
+      ensure
+        iter.finalize
+      end
+    end
+
     # Iterate over packages of matching key and value.
     def each_match(key, val, &block)
       itr = init_iterator(key, val)

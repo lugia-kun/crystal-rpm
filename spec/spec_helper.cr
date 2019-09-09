@@ -302,6 +302,7 @@ EOF
       {% opts[:input] = "Process::Redirect::Close".id %}
       Process.run("crystal", %args, {{opts.double_splat}} )
     ensure
+      %script.close
       %script.delete
     end
   end
