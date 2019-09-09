@@ -13,6 +13,7 @@
 \#*
 
 /spec/c-check.o
+/spec/run.*.cr
 
 # Spec creates directory
 root
