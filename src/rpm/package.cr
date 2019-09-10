@@ -35,28 +35,24 @@ module RPM
       Package.new(hdr)
     end
 
-    def self.open(filename : String)
-      Package.new(filename)
+    # Open existing RPM Package file
+    def self.open(filename)
+      RPM.transaction do |ts|
+        Package.open(filename, transaction: ts)
+      end
     end
 
+    # Open existing RPM package file, using existing transaction
+    def self.open(filename, *, transaction : Transaction)
+      transaction.read_package_file(filename)
+    end
+
+    # :nodoc:
     def initialize(hdr : LibRPM::Header)
       if hdr.null?
         @hdr = LibRPM.headerNew
       else
         @hdr = LibRPM.headerLink(hdr)
-      end
-    end
-
-    def initialize(filename : String)
-      @hdr = uninitialized LibRPM::Header
-      fd = LibRPM.Fopen(filename, "r")
-      raise "#{filename}: #{String.new(LibRPM.Fstrerror(fd))}" if LibRPM.Ferror(fd) != 0
-      begin
-        RPM.transaction do |ts|
-          rc = LibRPM.rpmReadPackageFile(ts.ptr, fd, filename, pointerof(@hdr))
-        end
-      ensure
-        LibRPM.Fclose(fd)
       end
     end
 

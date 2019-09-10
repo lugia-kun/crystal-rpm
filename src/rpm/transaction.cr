@@ -5,7 +5,45 @@ module RPM
   # Handles RPM transaction. Any RPM Database work must be accessed
   # via the Transaction.
   class Transaction
-    getter ptr : LibRPM::Transaction
+    # Element in transaction (install/remove/update)
+    #
+    # Transaction Element is valid only while the transaction which
+    # this element belongs to is allocated.
+    struct Element
+      @ptr : LibRPM::TransactionElement
+
+      def initialize(@ptr)
+      end
+    end
+
+    # Iterator of Transaction Element
+    class Iterator
+      @ptr : LibRPM::TransactionIterator
+      @etype : ElementTypes
+
+      include ::Iterator(Element)
+
+      def initialize(@ptr, @etype)
+      end
+
+      def finalize
+        @ptr = LibRPM.rpmtsiFree(@ptr)
+      end
+
+      def next
+        ptr = LibRPM.rpmtsiNext(@ptr, @etype)
+        if ptr.null?
+          stop
+        else
+          Element.new(ptr)
+        end
+      end
+    end
+
+    include ::Iterable(Element)
+    include ::Enumerable(Element)
+
+    @ptr : LibRPM::Transaction
     @keys : Set(String) = Set(String).new
 
     # Initialize a new transaction object.
@@ -17,7 +55,6 @@ module RPM
       if @ptr.null?
         raise Exception.new("Can't create Transaction")
       end
-      @ptr = ptr
       LibRPM.rpmtsSetRootDir(@ptr, root)
     end
 
@@ -46,6 +83,39 @@ module RPM
       else
         ProblemSet.new(ptr)
       end
+    end
+
+    # Read RPM package file
+    #
+    # For independent use, `RPM::Package.open`.
+    def read_package_file(filename : String | Path) : Package
+      filename_str = filename.to_s
+      fd = LibRPM.Fopen(filename_str, "r")
+      if LibRPM.Ferror(fd) != 0
+        raise "#{filename_str}: #{String.new(LibRPM.Fstrerror(fd))}"
+      end
+      hdr = uninitialized LibRPM::Header
+      rc = LibRPM.rpmReadPackageFile(@ptr, fd, filename_str, pointerof(hdr))
+      if rc != LibRPM::RC::OK
+        msg = String.build do |str|
+          str << "Failed to read package: "
+          str << filename_str << ": "
+          case rc
+          when LibRPM::RC::NOTTRUSTED
+            str << "key not trusted"
+          when LibRPM::RC::NOKEY
+            str << "no pubkey available"
+          when LibRPM::RC::NOTFOUND
+            str << "not found"
+          when LibRPM::RC::FAIL
+            str << "failed"
+          else
+            str << "unknown error"
+          end
+        end
+        raise TransactionError.new(msg)
+      end
+      Package.new(hdr)
     end
 
     # Create a new package iterator with given `tag` and `val`
@@ -94,15 +164,26 @@ module RPM
       end
     end
 
-    # Iterate over packages of matching key and value.
-    def each_match(key, val, &block)
-      itr = init_iterator(key, val)
-      itr.each(&block)
+    # Returns iterator for transaction elements
+    def each(etypes : ElementTypes = ElementTypes::ANY)
+      ptr = LibRPM.rpmtsiInit(@ptr)
+      Iterator.new(ptr, etypes)
     end
 
-    # Iterate over all packages.
-    def each(&block)
-      each_match(DbiTag::Packages, nil, &block)
+    # Iterate over each transaction element
+    def each(etypes : ElementTypes = ElementTypes::ANY, &block)
+      iterator = LibRPM.rpmtsiInit(@ptr)
+      if !iterator.null?
+        begin
+          while !(el = LibRPM.rpmtsiNext(iterator, etypes)).null?
+            yield Element.new(el)
+          end
+        ensure
+          LibRPM.rpmtsiFree(iterator)
+        end
+      else
+        nil
+      end
     end
 
     # Register a package to be installed
