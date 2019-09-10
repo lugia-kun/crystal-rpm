@@ -56,6 +56,7 @@ describe RPM do
       RPM["hoge"] = "hoge"
       RPM["hoge"].should eq("hoge")
     end
+
     it "can remove macro" do
       RPM["hoge"]?.should_not be_nil
       RPM["hoge"] = nil
@@ -949,6 +950,270 @@ describe RPM::Transaction do
     {% else %}
       pending "removes a package (Add `-Ddo_remove_test` to run)"
     {% end %}
+  end
+
+  describe "#each" do
+    it "returns iterator of install/remove elements" do
+      RPM.transaction do |ts|
+        simple1 = fixture("simple-1.0-0.i586.rpm")
+        simple2 = fixture("simple_with_deps-1.0-0.i586.rpm")
+        ts.install(ts.read_package_file(simple1), simple1)
+        ts.install(ts.read_package_file(simple2), simple2)
+        iter = ts.each
+        map = iter.map(&.name).to_a
+        map.should eq(["simple", "simple_with_deps"])
+      end
+    end
+
+    it "returns iterator of install elements" do
+      RPM.transaction do |ts|
+        simple1 = fixture("simple-1.0-0.i586.rpm")
+        ts.install(ts.read_package_file(simple1), simple1)
+        dbiter = ts.init_iterator(RPM::DbiTag::Packages, nil)
+        begin
+          remp = dbiter.first?
+          if remp
+            ts.delete(remp)
+          end
+        ensure
+          dbiter.finalize
+        end
+        iter = ts.each(RPM::ElementTypes::ADDED)
+        map = iter.map(&.name).to_a
+        map.should eq(["simple"])
+      end
+    end
+
+    it "returns iterator of deleted elements" do
+      RPM.transaction do |ts|
+        simple1 = fixture("simple-1.0-0.i586.rpm")
+        ts.install(ts.read_package_file(simple1), simple1)
+        dbiter = ts.init_iterator(RPM::DbiTag::Packages, nil)
+        remp = nil
+        begin
+          remp = dbiter.first?
+          if remp
+            ts.delete(remp)
+          end
+        ensure
+          dbiter.finalize
+        end
+        iter = ts.each(RPM::ElementTypes::REMOVED)
+        map = iter.map(&.name).to_a
+        if remp
+          map.should eq([remp.name])
+        else
+          map.should eq([] of String)
+        end
+      end
+    end
+
+    it "iterates over elements" do
+      RPM.transaction do |ts|
+        simple1 = fixture("simple-1.0-0.i586.rpm")
+        simple2 = fixture("simple_with_deps-1.0-0.i586.rpm")
+
+        ts.install(ts.read_package_file(simple1), simple1)
+        ts.install(ts.read_package_file(simple2), simple2)
+        arr = [] of String
+        ts.each do |el|
+          arr << el.name
+        end
+        arr.should eq(["simple", "simple_with_deps"])
+      end
+    end
+  end
+
+  describe RPM::Transaction::Element do
+    describe "#type" do
+      it "returns ADDED for installing element" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.type.should eq(RPM::ElementType::ADDED)
+          end
+        end
+      end
+
+      it "returns REMOVED for removing element" do
+        RPM.transaction do |ts|
+          pkg = ts.db_iterator do |iter|
+            iter.first?
+          end
+          if pkg.nil?
+            raise "No packages installed!"
+          end
+          ts.delete(pkg)
+          ts.each do |el|
+            el.type.should eq(RPM::ElementType::REMOVED)
+          end
+        end
+      end
+    end
+
+    describe "#epoch" do
+      it "returns nil for no epoch package" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.epoch.should be_nil
+          end
+        end
+      end
+
+      it "returns a epoch" do
+        RPM.transaction do |ts|
+          pkg = ts.db_iterator do |iter|
+            iter.regexp(RPM::Tag::Epoch.value, RPM::MireMode::GLOB, "[1-9]*")
+            iter.find { |x| x }
+          end
+          if pkg.nil?
+            raise "TODO: No installed packages are using epoch."
+          else
+            epoch = pkg[RPM::Tag::Epoch].as(UInt32)
+            epoch.should be >= 1
+
+            ts.delete(pkg)
+            ts.each do |el|
+              el.epoch.should eq(epoch.to_s)
+            end
+          end
+        end
+      end
+    end
+
+    describe "#version" do
+      it "returns version string installed or removed" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.version.should eq("1.0")
+          end
+        end
+      end
+    end
+
+    describe "#release" do
+      it "returns release string installed or removed" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.release.should eq("0")
+          end
+        end
+      end
+    end
+
+    describe "#arch" do
+      it "returns arch string installed or moved" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.arch.should eq("i586")
+          end
+        end
+      end
+    end
+
+    describe "#key" do
+      it "returns key string installed or moved" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), "sample_key")
+          ts.each do |el|
+            el.key.should eq("sample_key")
+          end
+        end
+      end
+
+      pending "returns nil for NULL key" do
+        crystal_rpm_does_not_allow_setting_nil_for_the_key = true
+        crystal_rpm_does_not_allow_setting_nil_for_the_key.should be_true
+      end
+    end
+
+    describe "#is_source?" do
+      it "returns false if binary package" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.is_source?.should be_false
+          end
+        end
+      end
+    end
+
+    describe "#package_file_size" do
+      it "returns the size of pacage" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.i586.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.package_file_size.should eq(RPM::LibRPM::Loff.new(2249))
+          end
+        end
+      end
+    end
+
+    describe "#problems" do
+      # The function does not exist in RPM 4.8.
+      it "returns install problems" do
+        simple1 = fixture("simple_with_deps-1.0-0.i586.rpm")
+        simple2 = fixture("simple-1.0-0.i586.rpm")
+        r, w = IO.pipe
+        ret = run_in_subproc(simple1, simple2, env: {"LC_ALL" => "C"}, error: w) do
+          RPM.transaction do |ts|
+            ts.install(ts.read_package_file(simple1), simple1)
+            ts.install(ts.read_package_file(simple2), simple2)
+            ts.check
+            ts.each do |el|
+              probs = el.problems
+              if probs
+                str = String.build do |str|
+                  str << el.name << ":\n"
+                  probs.each do |prob|
+                    str << "- " << prob.to_s << "\n"
+                  end
+                end
+                STDERR.print str
+              end
+            end
+          end
+          exit 0
+        end
+        w.close
+        lines = [] of String
+        while line = r.gets(chomp: true)
+          lines << line
+        end
+        r.close
+        {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
+          ret.exit_code.should_not eq(0)
+          # We do not assume the message of ld.
+          lines.each do |l|
+            SPEC_DEBUG_LOG.debug do
+              String.build do |s|
+                s << "TransactionError#problems: " << l
+              end
+            end
+          end
+        {% else %}
+          ret.exit_code.should eq(0)
+          expected = [
+            "simple_with_deps:",
+            "- a is needed by simple_with_deps-1.0-0.i586",
+            "- b > 1.0 is needed by simple_with_deps-1.0-0.i586",
+          ]
+          lines.should eq(expected)
+        {% end %}
+      end
+    end
   end
 end
 

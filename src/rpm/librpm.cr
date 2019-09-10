@@ -185,6 +185,8 @@ module RPM
     type Header = Pointer(Void)
     type HeaderIterator = Pointer(Void)
     alias Transaction = Pointer(Void)
+    type TransactionElement = Pointer(Void)
+    type TransactionIterator = Pointer(Void)
     type Database = Pointer(Void)
     type DatabaseMatchIterator = Pointer(Void)
     type MacroContext = Pointer(Void)
@@ -214,6 +216,8 @@ module RPM
     alias RPMPsi = ProblemSetIterator
     alias RPMTd = TagData
     alias RPMTs = Transaction
+    alias RPMTe = TransactionElement
+    alias RPMTsi = TransactionIterator
     alias RPMDb = Database
     alias RPMFi = FileInfo
     alias RPMDbMatchIterator = DatabaseMatchIterator
@@ -1040,6 +1044,54 @@ module RPM
     fun rpmtsAddEraseElement(Transaction, Header, Int) : Int
     fun rpmtsEmpty(Transaction) : Void
 
+    # ## Transaction Element API
+    enum ElementType
+      ADDED   = (1 << 0)
+      REMOVED = (1 << 1)
+    end
+
+    {% begin %}
+    @[Flags]
+    enum ElementTypes : RPMFlags
+      ANY = 0   # For using with `rpmtsiNext`
+      {% for el in ElementType.constants %}
+        {{el}} = ElementType::{{el}}
+      {% end %}
+    end
+    {% end %}
+
+    fun rpmteHeader(TransactionElement) : Header
+    fun rpmteSetHeader(TransactionElement, Header) : Header
+    fun rpmteType(TransactionElement) : ElementType
+    fun rpmteN(TransactionElement) : Pointer(UInt8)
+    fun rpmteE(TransactionElement) : Pointer(UInt8)
+    fun rpmteV(TransactionElement) : Pointer(UInt8)
+    fun rpmteR(TransactionElement) : Pointer(UInt8)
+    fun rpmteA(TransactionElement) : Pointer(UInt8)
+    fun rpmteO(TransactionElement) : Pointer(UInt8)
+    fun rpmteIsSource(TransactionElement) : Int
+    fun rpmtePkgFileSize(TransactionElement) : Loff
+    fun rpmteParent(TransactionElement) : TransactionElement
+    fun rpmteSetParent(TransactionElement, TransactionElement) : TransactionElement
+    fun rpmteProblems(TransactionElement) : ProblemSet
+    fun rpmteCleanProblems(TransactionElement) : Void
+    fun rpmteCleanDS(TransactionElement) : Void
+    fun rpmteSetDependsOn(TransactionElement, TransactionElement) : Void
+    fun rpmteDependsOn(TransactionElement) : TransactionElement
+    fun rpmteDBOffset(TransactionElement) : Int
+    fun rpmteEVR(TransactionElement) : Pointer(UInt8)
+    fun rpmteNEVR(TransactionElement) : Pointer(UInt8)
+    fun rpmteNEVRA(TransactionElement) : Pointer(UInt8)
+    fun rpmteKey(TransactionElement) : FnpyKey
+    fun rpmteFailed(TransactionElement) : Int
+    fun rpmteDS(TransactionElement, TagValue) : DependencySet
+    # fun rpmteFiles(TransactionElement) : FileInfoSet
+    # fun rpmteFI(TransactionElement) : FileInfoSetIterator
+
+    fun rpmtsiInit(Transaction) : TransactionIterator
+    fun rpmtsiFree(TransactionIterator) : TransactionIterator
+    fun rpmtsiNext(TransactionIterator, ElementTypes) : TransactionElement
+
     # ## RC
     fun rpmReadConfigFiles(UInt8*, UInt8*) : Int
 
@@ -1129,6 +1181,9 @@ module RPM
   alias TransactionFlags = LibRPM::TransFlags
   alias MireMode = LibRPM::MireMode
   alias ProblemType = LibRPM::ProblemType
+
+  alias ElementType = LibRPM::ElementType
+  alias ElementTypes = LibRPM::ElementTypes
 
   alias BuildPkgFlags = LibRPM::BuildPkgFlags
   alias BuildFlags = LibRPM::BuildFlags
