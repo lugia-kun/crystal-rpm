@@ -7,6 +7,24 @@ The [RPM](http://rpm.org/) bindings for
 
 It supports RPM 4.8.0 or later.
 
+## Before use
+
+RPM is licensed under [GNU GPL](https://rpm.org/about.html). This
+means all libraries and applications which link to RPM must be
+licensed under GNU GPL. But, Crystal (and standard libraries) are
+licensed under Apache-2.0, which will be incompatible.
+
+Actual `COPYING` file in source tarball of RPM says that library part
+of RPM (i.e., `librpm`) is licensed under LGPL 2.0 or later too, which
+can be compatible with MIT and, from LGPL 3.0, which they implicitly
+allows to apply, Apache-2.0.
+
+So currently, crystal-rpm is licensed under both [GPLv2 or
+later](./COPYING) and [MIT](./LICENSE) (which should be compatible
+with LGPL 2.0 and Apache-2.0). We are thinking you do not have a
+chance to use this library under the conditions of GPLv2, but left to
+let us to keep in mind.
+
 ## Installation
 
 1. Add the dependency to your `shard.yml`:
