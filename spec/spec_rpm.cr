@@ -1065,20 +1065,12 @@ describe RPM::Transaction do
 
       it "returns a epoch" do
         RPM.transaction do |ts|
-          pkg = ts.db_iterator do |iter|
-            iter.regexp(RPM::Tag::Epoch.value, RPM::MireMode::GLOB, "[1-9]*")
-            iter.find { |x| x }
-          end
-          if pkg.nil?
-            raise "TODO: No installed packages are using epoch."
-          else
-            epoch = pkg[RPM::Tag::Epoch].as(UInt32)
-            epoch.should be >= 1
+          simple1 = fixture("simple_with_epoch-1.0-0.noarch.rpm")
+          pkg = ts.read_package_file(simple1)
+          ts.install(pkg, simple1)
 
-            ts.delete(pkg)
-            ts.each do |el|
-              el.epoch.should eq(epoch.to_s)
-            end
+          ts.each do |el|
+            el.epoch.should eq("11")
           end
         end
       end
@@ -1144,6 +1136,16 @@ describe RPM::Transaction do
           ts.install(ts.read_package_file(simple1), simple1)
           ts.each do |el|
             el.is_source?.should be_false
+          end
+        end
+      end
+
+      it "returns true if source package" do
+        RPM.transaction do |ts|
+          simple1 = fixture("simple-1.0-0.src.rpm")
+          ts.install(ts.read_package_file(simple1), simple1)
+          ts.each do |el|
+            el.is_source?.should be_true
           end
         end
       end
