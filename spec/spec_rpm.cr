@@ -902,54 +902,47 @@ describe RPM::Transaction do
   end
 
   describe "#delete" do
-    # TODO: RPM in OpenSUSE works with this semantic, but not in
-    # others. This must be investigated...
-    #
     # RPM 4.8 has a bug that root directory is not set properly.
     # So we need to run in fresh environment.
-    {% if flag?("do_remove_test") %}
-      it "removes a pacakge" do
-        Dir.mktmpdir do |tmproot|
-          install_simple(root: tmproot)
-          install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: tmproot)
-          stat = run_in_subproc(tmproot) do
-            RPM.transaction(tmproot) do |ts|
-              removed = [] of RPM::Package
-              ts.db_iterator(RPM::DbiTag::Name, "simple") do |iter|
-                iter.each do |pkg|
-                  if pkg[RPM::Tag::Version].as(String) == "1.0" &&
-                     pkg[RPM::Tag::Release].as(String) == "0" &&
-                     pkg[RPM::Tag::Arch].as(String) == "i586"
-                    ts.delete(pkg)
-                    removed << pkg
-                  end
+    it "removes a pacakge" do
+      Dir.mktmpdir do |tmproot|
+        install_simple(root: tmproot)
+        install_simple(package: "simple_with_deps-1.0-0.i586.rpm", root: tmproot)
+        stat = run_in_subproc(tmproot) do
+          RPM.transaction(tmproot) do |ts|
+            removed = [] of RPM::Package
+            ts.db_iterator(RPM::DbiTag::Name, "simple") do |iter|
+              iter.each do |pkg|
+                if pkg[RPM::Tag::Version].as(String) == "1.0" &&
+                   pkg[RPM::Tag::Release].as(String) == "0" &&
+                   pkg[RPM::Tag::Arch].as(String) == "i586"
+                  ts.delete(pkg)
+                  removed << pkg
                 end
               end
-              if removed.empty?
-                raise Exception.new("No packages found to remove!")
-              end
-
-              ts.order
-              ts.check
-              if (probs = ts.problems?)
-                probs.each do |prob|
-                  STDERR.puts prob.to_s
-                end
-                raise Exception.new("Transaction has problem")
-              end
-
-              ts.clean
-              ts.commit
             end
+            if removed.empty?
+              raise Exception.new("No packages found to remove!")
+            end
+
+            ts.order
+            ts.check
+            if (probs = ts.problems?)
+              probs.each do |prob|
+                STDERR.puts prob.to_s
+              end
+              raise Exception.new("Transaction has problem")
+            end
+
+            ts.clean
+            ts.commit
           end
-          stat.exit_code.should eq(0)
-          test_path = File.join(tmproot, "usr/share/simple/README")
-          File.exists?(test_path).should be_false
         end
+        stat.exit_code.should eq(0)
+        test_path = File.join(tmproot, "usr/share/simple/README")
+        File.exists?(test_path).should be_false
       end
-    {% else %}
-      pending "removes a package (Add `-Ddo_remove_test` to run)"
-    {% end %}
+    end
   end
 
   describe "#each" do
