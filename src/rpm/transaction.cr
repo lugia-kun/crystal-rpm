@@ -94,28 +94,32 @@ module RPM
       if LibRPM.Ferror(fd) != 0
         raise "#{filename_str}: #{String.new(LibRPM.Fstrerror(fd))}"
       end
-      hdr = uninitialized LibRPM::Header
-      rc = LibRPM.rpmReadPackageFile(@ptr, fd, filename_str, pointerof(hdr))
-      if rc != LibRPM::RC::OK
-        msg = String.build do |str|
-          str << "Failed to read package: "
-          str << filename_str << ": "
-          case rc
-          when LibRPM::RC::NOTTRUSTED
-            str << "key not trusted"
-          when LibRPM::RC::NOKEY
-            str << "no pubkey available"
-          when LibRPM::RC::NOTFOUND
-            str << "not found"
-          when LibRPM::RC::FAIL
-            str << "failed"
-          else
-            str << "unknown error"
+      begin
+        hdr = uninitialized LibRPM::Header
+        rc = LibRPM.rpmReadPackageFile(@ptr, fd, filename_str, pointerof(hdr))
+        if rc != LibRPM::RC::OK
+          msg = String.build do |str|
+            str << "Failed to read package: "
+            str << filename_str << ": "
+            case rc
+            when LibRPM::RC::NOTTRUSTED
+              str << "key not trusted"
+            when LibRPM::RC::NOKEY
+              str << "no pubkey available"
+            when LibRPM::RC::NOTFOUND
+              str << "not found"
+            when LibRPM::RC::FAIL
+              str << "failed"
+            else
+              str << "unknown error"
+            end
           end
+          raise TransactionError.new(msg)
         end
-        raise TransactionError.new(msg)
+        Package.new(hdr)
+      ensure
+        LibRPM.Fclose(fd)
       end
-      Package.new(hdr)
     end
 
     # Create a new package iterator with given `tag` and `val`
@@ -220,21 +224,26 @@ module RPM
         labl = pkg[DbiTag::Label].as(String)
         iter = init_iterator(DbiTag::Label, labl)
       end
-
-      delete_by_iterator(iter)
+      begin
+        delete_by_iterator(iter)
+      ensure
+        iter.finalize
+      end
     end
 
     # Register given package to be deleted (by a name)
     def delete(pkg : String)
-      iter = init_iterator(DbiTag::Label, pkg)
-      delete_by_iterator(iter)
+      db_iterator(DbiTag::Label, pkg) do |iter|
+        delete_by_iterator(iter)
+      end
     end
 
     # Register given dependency to be deleted
     def delete(pkg : Dependency)
-      iter = init_iterator(DbiTag::Label, pkg.name)
-      iter.set_iterator_version(pkg.version)
-      delete_by_iterator(iter)
+      db_iterator(DbiTag::Label, pkg.name) do |iter|
+        iter.set_iterator_version(pkg.version)
+        delete_by_iterator(iter)
+      end
     end
 
     # Determine package order in the transaction according to

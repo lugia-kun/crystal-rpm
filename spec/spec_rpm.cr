@@ -1515,6 +1515,7 @@ describe "Files" do
       pid = Process.pid
       path = "/proc/#{pid}/fd"
       dbpath = RPM["_dbpath"]
+      cwd = File.dirname(__FILE__)
       system("ls", ["-l", path])
       Dir.open(path) do |dir|
         dir.each do |x|
@@ -1528,8 +1529,8 @@ describe "Files" do
             STDERR.flush
             next
           end
-          if tg.starts_with?(dbpath)
-            raise "All DB should be closed: '#{tg}' is opened."
+          if tg.starts_with?(dbpath) || tg.starts_with?(cwd)
+            raise "All DB or file should be closed: '#{tg}' is opened."
           end
         end
       end

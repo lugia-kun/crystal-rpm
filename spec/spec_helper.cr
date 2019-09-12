@@ -308,6 +308,54 @@ EOF
   end
 end
 
+def read_fd_entries(path = "/proc/self/fd")
+  map = {} of String => String
+  exp = File.real_path(path)
+  Dir.each_child(path) do |entry|
+    fp = File.join(path, entry)
+    next unless File.symlink?(fp)
+    dest = File.readlink(fp)
+    next if dest == path || dest == exp
+    map[entry] = dest
+  end
+  map
+end
+
+class FileLeftOpened < Exception
+end
+
+def open_files_check(&block)
+  open_files_at_start = read_fd_entries
+  begin
+    yield
+  ensure
+    open_files_at_exit = read_fd_entries
+    open_files_at_exit.delete_if do |ent, path|
+      open_files_at_start.has_key?(ent)
+    end
+    if (sz = open_files_at_exit.size) > 0
+      msg = String.build do |str|
+        e = open_files_at_exit.each
+        first = e.next.as(Tuple(String, String))
+        str << "File '" << first[1] << "' "
+        if sz > 1
+          sz1 = sz - 1
+          if sz1 > 1
+            str << "and " << sz1 << " more files are"
+          else
+            second = e.next.as(Tuple(String, String))
+            str << "and '" << second[1] << "' are"
+          end
+        else
+          str << "is"
+        end
+        str << " left opened"
+      end
+      raise FileLeftOpened.new(msg)
+    end
+  end
+end
+
 # # Spec of helper
 describe "helper" do
   describe "#rpm" do
@@ -430,6 +478,69 @@ describe "helper" do
       r.close
       err.should match(/undefined constant Spec/)
       stat.should_not eq(0)
+    end
+  end
+
+  describe "#open_files_check" do
+    it "detects files are left opened" do
+      fp = nil
+      path = fixture("a.spec")
+      expect_raises(FileLeftOpened, "File '#{path}' is left opened") do
+        open_files_check do
+          fp = File.open(path, "r")
+        end
+      end
+      if fp
+        fp.close
+      end
+    end
+
+    it "passes files are properly closed" do
+      open_files_check do
+        fp = File.open(fixture("a.spec"), "r")
+        fp.close
+      end
+    end
+
+    it "detects many files are left opened" do
+      fp1 = nil
+      fp2 = nil
+      path = fixture("a.spec")
+      expect_raises(FileLeftOpened, "File '#{path}' and '#{path}' are left opened") do
+        open_files_check do
+          fp1 = File.open(path, "r")
+          fp2 = File.open(path, "r")
+        end
+      end
+      if fp1
+        fp1.close
+      end
+      if fp2
+        fp2.close
+      end
+    end
+
+    it "detects many files are left opened" do
+      fp1 = nil
+      fp2 = nil
+      fp3 = nil
+      path = fixture("a.spec")
+      expect_raises(FileLeftOpened, "File '#{path}' and 2 more files are left opened") do
+        open_files_check do
+          fp1 = File.open(path, "r")
+          fp2 = File.open(path, "r")
+          fp3 = File.open(path, "r")
+        end
+      end
+      if fp1
+        fp1.close
+      end
+      if fp2
+        fp2.close
+      end
+      if fp3
+        fp3.close
+      end
     end
   end
 end
