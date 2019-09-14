@@ -1386,11 +1386,10 @@ describe RPM::Spec do
       {% end %}
     else
       sizeof(RPM::LibRPM::Spec_s).should eq(sz_spec_s)
-
-      RPM::LibRPM::Spec_s.offsetof(@spec_file).should eq(CCheck.offset_spec_s("specFile"))
-      RPM::LibRPM::Spec_s.offsetof(@lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
-      RPM::LibRPM::Spec_s.offsetof(@sources).should eq(CCheck.offset_spec_s("sources"))
-      RPM::LibRPM::Spec_s.offsetof(@packages).should eq(CCheck.offset_spec_s("packages"))
+      offsetof(RPM::LibRPM::Spec_s, @spec_file).should eq(CCheck.offset_spec_s("specFile"))
+      offsetof(RPM::LibRPM::Spec_s, @lbuf_ptr).should eq(CCheck.offset_spec_s("lbufPtr"))
+      offsetof(RPM::LibRPM::Spec_s, @sources).should eq(CCheck.offset_spec_s("sources"))
+      offsetof(RPM::LibRPM::Spec_s, @packages).should eq(CCheck.offset_spec_s("packages"))
     end
   end
 
@@ -1405,9 +1404,8 @@ describe RPM::Spec do
       {% end %}
     else
       sizeof(RPM::LibRPM::Package_s).should eq(sz_pkg_s)
-
-      RPM::LibRPM::Package_s.offsetof(@header).should eq(CCheck.offset_package_s("header"))
-      RPM::LibRPM::Package_s.offsetof(@next).should eq(CCheck.offset_package_s("next"))
+      offsetof(RPM::LibRPM::Package_s, @header).should eq(CCheck.offset_package_s("header"))
+      offsetof(RPM::LibRPM::Package_s, @next).should eq(CCheck.offset_package_s("next"))
     end
   end
 
@@ -1417,10 +1415,9 @@ describe RPM::Spec do
     when -1
       raise "compilation failed"
     else
-      RPM::LibRPM::BuildArguments_s.offsetof(@rootdir).should eq(CCheck.offset_buildarguments_s("rootdir"))
-      RPM::LibRPM::BuildArguments_s.offsetof(@build_amount).should eq(CCheck.offset_buildarguments_s("buildAmount"))
-
       sizeof(RPM::LibRPM::BuildArguments_s).should eq(sz_bta_s)
+      offsetof(RPM::LibRPM::BuildArguments_s, @rootdir).should eq(CCheck.offset_buildarguments_s("rootdir"))
+      offsetof(RPM::LibRPM::BuildArguments_s, @build_amount).should eq(CCheck.offset_buildarguments_s("buildAmount"))
     end
   end
 
