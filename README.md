@@ -16,8 +16,7 @@ licensed under Apache-2.0, which will be incompatible.
 
 Actual `COPYING` file in source tarball of RPM says that library part
 of RPM (i.e., `librpm`) is licensed under LGPL 2.0 or later too, which
-can be compatible with MIT and, from LGPL 3.0, which they implicitly
-allows to apply, Apache-2.0.
+can be compatible with MIT and Apache-2.0.
 
 So currently, crystal-rpm is licensed under both [GPLv2 or
 later](./COPYING) and [MIT](./LICENSE) (which should be compatible
@@ -41,7 +40,7 @@ dependencies:
 require "rpm"
 ```
 
-The development files (pkg-config file) of [RPM] is
+The development files (pkg-config file) of [RPM](https://rpm.org/) is
 required. Typically, it can be installed by `yum install rpm-devel` on
 CentOS or Red Hat, `dnf install rpm-devel` on Fedora, and `zypper in
 rpm-devel` on openSUSE or SLES.
@@ -66,35 +65,32 @@ pkg.obsoletes # => Array of Obsolstes.
 ```crystal
 RPM.transaction do |ts|
   path = "pkg_to_install-1.0-0.x86_64.rpm"
-  pkg = RPM::Package.open(path)
+  pkg = ts.read_package_file(path)
   
   ts.install(pkg, path) # Add installation package. Package path is required.
   ts.commit   # Run Transaction
 end
 ```
 
+BTW, `RPM::Package.open` allocates a `Transaction` inside. So if you
+have an instance of `Transaction` already,
+`Transaction#read_package_file` reduces allocations.
+
 ### Search installed packages
 
 ```crystal
 # with given name
 RPM.transaction do |ts|
-  iter = ts.init_iterator(RPM::DbiTag::Name, "package-name-to-find")
-  
-  # You should make sure iterator has finalized (for closing database)
-  begin
+  ts.db_iterator(RPM::DbiTag::Name, "package-name-to-find") do |iter|
     iter.each do |pkg|
       # Iterator over matching packages.
     end
-  ensure
-    iter.finalize
   end
 end
 
 # with given regexp
 RPM.transaction do |ts|
-  iter = ts.init_iterator   # Create iterator of installed packages
-
-  begin
+  ts.db_iterator do |iter|
     # Set condition
     iter.regexp(RPM::DbiTag::Name, # <= Entry to search (here, Name)
                 RPM::MireMode::REGEX, # <= Default matching method
@@ -104,54 +100,40 @@ RPM.transaction do |ts|
     iter.each do |pkg|
       puts pkg[RPM::Tag::Version].as(String) # => (Version of package "simple")
     end
-  ensure
-    iter.finalize
   end
 end
 
 # Iterate over all installed packages
 RPM.transaction do |ts|
-  iter = ts.init_iterator
-  begin
+  ts.db_iterator do |iter|
     iter.each do |pkg|
       # ... iterates over all installed packages.
     end
-  ensure
-    iter.finalize
   end
 end
 
 # Lookup package(s) which contains a specific file
 RPM.transaction do |ts|
-  iter = ts.init_iterator(RPM::DbiTag::BaseNames, "/path/to/lookup")
-  begin
+  ts.db_iterator(RPM::DbiTag::BaseNames, "/path/to/lookup") do |iter|
     iter.each do |pkg|
       # ... iterates over packages contains "/path/to/lookup"
     end
-  ensure
-    iter.finalize
   end
 end
 
 # NOTE: Using regexp with BaseNames, it will search packages which
 # contain a file whose basename is the given name.
 RPM.transaction do |ts|
-  iter = ts.init_iterator
-  begin
+  ts.db_iterator do |iter|
     iter.regexp(RPM::DbiTag::BaseNames, RPM::MireMode::STRCMP, "README")
     iter.each do |pkg|
       # ... iterates over packages which contain a file named "README"
     end
-  ensure
-    iter.finalize
   end
 end
 ```
 
 ### Remove package
-
-Currently, the following code does not work unless you are using
-OpenSUSE (see #1).
 
 ```crystal
 RPM.transaction do |ts|
@@ -163,6 +145,9 @@ end
 ```
 
 ### Using Transaction without block
+
+For installing and/or removing packages, the DB handle is bound to the
+transaction. So, DB must be closed via transaction.
 
 ```crystal
 ts = RPM::Transaction.new
@@ -176,6 +161,26 @@ ensure
   ts.close_db # Must close DB
 end
 ts.finalize # Not nesseary, but recommended.
+```
+
+### Using DB iterator without block
+
+For searching packages in DB, the DB handle is bound to the
+iterator. So, DB must be closed via finalizing the iterator.
+
+```crystal
+ts = RPM::Transaction.new
+begin
+  iter = ts.init_iterator(...)
+  begin
+    iter.each do |item|
+      # work with item
+    end
+  ensure
+    iter.finalize # Must finalize iterator.
+  end
+end
+ts.finalize
 ```
 
 ### Install/Remove Problems
@@ -209,8 +214,17 @@ spec.buildrequires # => Array of BuildRequires.
 ### Build RPM
 
 ```crystal
+# Steps to be run.
+#
+# Here, %prep, %build, %install, %check, %clean and generates the source
+# and binary packages.
+#
+amount = RPM::BuildFlags.flags(PREP, BUILD, INSTALL, CHECK, CLEAN,
+  PACKAGESOURCE, PACKAGEBINARY)
+
+# Read specfile
 spec = RPM::Spec.open("foo.spec")
-spec.build
+spec.build(build_amount: amount)
 ```
 
 ## Development
@@ -218,20 +232,37 @@ spec.build
 The definitions of structs are written by hand. Tests can check their
 size and member offsets if you have a C compiler (optional).
 
-[fakechroot](https://github.com/dex4er/fakechroot/wiki) (recommended)
-or root permission (i.e., `sudo`) is required to run `crystal spec`,
-since this spec uses `chroot()`.
+[fakechroot](https://github.com/dex4er/fakechroot/wiki) (recommended),
+[proot](https://proot-me.github.io/) (untested), or root permission
+(i.e., `sudo`) is required to run `crystal spec`, since this spec uses
+`chroot()`.
 
 Alternatively, using Docker is another method to test:
 
 ```bash
-$ shards install
-$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
-$ docker run -v $(pwd):/work -w /work [version] crystal spec
+     host$ shards install
+     host$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
+     host$ docker run -it -v $(pwd):/work -w /work [version] ./.travis.sh
 ```
 
-Note that shards should be installed on local (because git in CentOS 6
-is too old and does not work with shards).
+Or, manually,
+
+```bash
+     host$ shards install
+     host$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
+     host$ docker run -it -v $(pwd):/work -w /work [version]
+container# useradd -u $(stat -c %u spec/data/simple.spec) crystal || :
+container# crystal spec [arguments]
+container# exit
+```
+
+Notes:
+
+* Git in CentOS 6 is too old and does not work with shards, so shards
+  should be install on the local.
+* In Fedora and CentOS, rpmbuild or rpmrc or rpmmacro files requires
+  that the spec files must be owned by a valid user, when building
+  RPMs.
 
 ## Contributing
 
