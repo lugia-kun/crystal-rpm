@@ -1578,13 +1578,13 @@ describe RPM::Spec do
 end
 
 describe "Files" do
-  {% if flag?("do_openfile_test") %}
+  {% if ! flag?("skip_openfile_test") %}
     it "should not be opened" do
       pid = Process.pid
       path = "/proc/#{pid}/fd"
       dbpath = RPM["_dbpath"]
       cwd = File.dirname(__FILE__)
-      system("ls", ["-l", path])
+      # system("ls", ["-l", path])
       Dir.open(path) do |dir|
         dir.each do |x|
           fp = File.join(path, x)
@@ -1593,8 +1593,9 @@ describe "Files" do
             next unless info.symlink?
             tg = File.real_path(fp)
           rescue e : Errno
-            STDERR.puts e.to_s
-            STDERR.flush
+            if e.errno != Errno::ENOENT
+              raise e
+            end
             next
           end
           if tg.starts_with?(dbpath) || tg.starts_with?(cwd)
@@ -1610,6 +1611,6 @@ describe "Files" do
       end
     end
   {% else %}
-    pending "should not be opened (Add `-Ddo_openfile_test` to run)"
+    pending "should not be opened (`-Dskip_openfile_test` is given)"
   {% end %}
 end
