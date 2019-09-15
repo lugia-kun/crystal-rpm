@@ -76,4 +76,11 @@ module RPM
   ensure
     LibC.free(expnd) if expnd && !expnd.null?
   end
+
+  # Allocation Error occured within librpm API
+  class AllocationError < Errno
+    def initialize(name : String)
+      super(name, Errno::ENOMEM)
+    end
+  end
 end

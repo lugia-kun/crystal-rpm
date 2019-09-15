@@ -10,27 +10,38 @@ module RPM
     end
   end
 
+  class PackageError < Exception
+  end
+
   class Package
     getter hdr : LibRPM::Header
 
     def self.create(name : String, version : Version)
       hdr = LibRPM.headerNew
-      if LibRPM.headerPutString(hdr, Tag::Name, name) != 1
-        raise "Can't set package name: #{name}"
+      if hdr.null?
+        raise AllocationError.new("headerNew")
       end
-      if LibRPM.headerPutString(hdr, Tag::Version, version.v) != 1
-        raise "Can't set package version: #{version.v}"
-      end
-      if version.e
-        epoch = UInt32.new(version.e.as(Int32))
-        if LibRPM.headerPutUint32(hdr, Tag::Epoch, pointerof(epoch), 1) != 1
-          raise "Can't set package epoch: #{version.e}"
+      begin
+        if LibRPM.headerPutString(hdr, Tag::Name, name) != 1
+          raise PackageError.new("Can't set package name: #{name}")
         end
-      end
-      if version.r
-        if LibRPM.headerPutString(hdr, Tag::Release, version.r.as(String)) != 1
-          raise "Can't set package release: #{version.r}"
+        if LibRPM.headerPutString(hdr, Tag::Version, version.v) != 1
+          raise PackageError.new("Can't set package version: #{version.v}")
         end
+        if (ee = version.e)
+          epoch = ee.as(UInt32)
+          if LibRPM.headerPutUint32(hdr, Tag::Epoch, pointerof(epoch), 1) != 1
+            raise PackageError.new("Can't set package epoch: #{epoch}")
+          end
+        end
+        if (release = version.r)
+          if LibRPM.headerPutString(hdr, Tag::Release, release) != 1
+            raise PackageError.new("Can't set package release: #{release}")
+          end
+        end
+      rescue e : Exception
+        LibRPM.headerFree(hdr)
+        raise e
       end
       Package.new(hdr)
     end
