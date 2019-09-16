@@ -1578,7 +1578,7 @@ describe RPM::Spec do
 end
 
 describe "Files" do
-  {% if ! flag?("skip_openfile_test") %}
+  {% if !flag?("skip_openfile_test") %}
     it "should not be opened" do
       pid = Process.pid
       path = "/proc/#{pid}/fd"
