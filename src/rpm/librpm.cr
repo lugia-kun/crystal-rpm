@@ -947,6 +947,7 @@ module RPM
     fun rpmtdGetString(TagData) : Pointer(UInt8)
     fun rpmtdGetNumber(TagData) : UInt64
 
+    fun rpmtdSetTag(TagData, TagVal) : Int
     fun rpmtdFromUint8(TagData, TagVal, UInt8*, Count) : Int
     fun rpmtdFromUint16(TagData, TagVal, UInt16*, Count) : Int
     fun rpmtdFromUint32(TagData, TagVal, UInt32*, Count) : Int
@@ -1176,6 +1177,8 @@ module RPM
   alias FileState = LibRPM::FileState
   alias FileAttrs = LibRPM::FileAttrs
   alias CallbackType = LibRPM::CallbackType
+
+  alias TagDataFormat = LibRPM::TagDataFormat
 
   alias Sense = LibRPM::Sense
   alias TransactionFlags = LibRPM::TransFlags

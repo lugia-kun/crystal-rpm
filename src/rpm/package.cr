@@ -16,6 +16,7 @@ module RPM
   class Package
     getter hdr : LibRPM::Header
 
+    # Creates a new package header with given name and version
     def self.create(name : String, version : Version)
       hdr = LibRPM.headerNew
       if hdr.null?
@@ -67,103 +68,147 @@ module RPM
       end
     end
 
+    # Cleanup the handle to package header.
+    #
+    # The package header does not seem to depend to the external
+    # resources (fd for the file or DB). So calling this method is not
+    # mandated.
     def finalize
-      LibRPM.headerFree(@hdr)
+      @hdr = LibRPM.headerFree(@hdr)
     end
 
-    # def add_dependency(dep : Dependency)
-    # end
-
+    # Format a string with package data
+    #
+    # The format is same to the `--queryformat` argument in `rpm -q`:
+    # for example, `%{name}` will be replaced with the name of the
+    # package and `%{version}` will be replaced with the version of
+    # the package.
     def sprintf(fmt)
       error = uninitialized LibRPM::ErrorMsg
       val = LibRPM.headerFormat(@hdr, fmt, pointerof(error))
-      raise Exception.new(String.new(error)) if val.null?
+      raise PackageError.new(String.new(error)) if val.null?
       String.new(val)
     end
 
+    # Returns the signature string
+    #
+    # Returns the signature string with hexadecimal charactors.
+    # Returns the string `(none)` if not set.
+    #
+    # If you want a binary data, you may use
+    # `#with_tagdata(Tag::SigMD5)` and `TagData#bytes`. But it just
+    # converts back to binary from this hexadecimal character representation.
     def signature
-      sprintf("%{sigmd5}")
+      with_tagdata?(Tag::SigMD5) do |md5|
+        if md5
+          md5.format1(TagDataFormat::STRING)
+        else
+          "(none)"
+        end
+      end
     end
 
+    # Returns the name of package.
+    #
+    # Shorthand for calling `#[]` with `Tag::Name`.
     def name
       self[Tag::Name].as(String)
     end
 
-    def files
-      basenames = self[Tag::BaseNames]
-      return [] of RPM::File if basenames.nil?
+    # Get the list of file paths.
+    #
+    # Handy function for getting file paths. Since RPM stores basename
+    # and dirname separately, this method concatenate them to represents
+    # list of fullpaths.
+    def file_paths : Array(String)
+      with_tagdata?(Tag::BaseNames) do |basenames|
+        if basenames
+          with_tagdata(Tag::DirNames, Tag::DirIndexes) do |dirname, diridxs|
+            Array(String).new(basenames.size) do |i|
+              basename = basenames[i].as(String)
+              diridx = diridxs[i].as(UInt32)
+              dirname = dirnames[diridx].as(String)
+              File.join(dirname, basename)
+            end
+          end
+        else
+          [] of String
+        end
+      end
+    end
 
-      basenames = basenames.as(Array(String))
-      dirnames = self[Tag::DirNames].as(Array(String))
-      diridxs = self[Tag::DirIndexes].as(Array(UInt32))
-      statelist = self[Tag::FileStates].as(Array(UInt8) | Nil)
-      flaglist = self[Tag::FileFlags].as(Array(UInt32) | Nil)
-      sizelist = self[Tag::FileSizes].as(Array(UInt32))
-      modelist = self[Tag::FileModes].as(Array(UInt16))
-      mtimelist = self[Tag::FileMTimes].as(Array(UInt32))
-      rdevlist = self[Tag::FileRDEVs].as(Array(UInt16))
-      linklist = self[Tag::FileLinkTos].as(Array(String))
-      md5list = self[Tag::FileDigests].as(Array(String))
-      ownerlist = self[Tag::FileUserName].as(Array(String))
-      grouplist = self[Tag::FileGroupName].as(Array(String))
-
-      basenames.map_with_index do |basename, i|
-        state = if statelist.nil?
-                  FileState::NORMAL
-                else
-                  FileState.from_value(statelist.as(Array(UInt8))[i])
-                end
-        attr = if flaglist.nil?
-                 FileAttrs::NONE
-               else
-                 FileAttrs.from_value(flaglist.as(Array(UInt32))[i])
-               end
-        RPM::File.new(
-          path: ::File.join(dirnames[diridxs[i]], basename),
-          md5sum: md5list[i],
-          link_to: linklist[i],
-          size: sizelist[i],
-          mtime: Time.unix(mtimelist[i]),
-          owner: ownerlist[i],
-          group: grouplist[i],
-          mode: modelist[i],
-          attr: attr,
-          state: state,
-          rdev: rdevlist[i]
-        )
+    # Get the list of files with extra metadata.
+    def files : Array(RPM::File)
+      with_tagdata?(Tag::BaseNames) do |basenames|
+        if basenames
+          # (considered to be) mandatory tags when basenames exists.
+          tags = {Tag::DirNames, Tag::DirIndexes, Tag::FileSizes,
+                  Tag::FileModes, Tag::FileMTimes, Tag::FileRDEVs,
+                  Tag::FileLinkTos, Tag::FileDigests, Tag::FileUserName,
+                  Tag::FileGroupName}
+          with_tagdata(*tags) do |dirnames, diridxs, sizes, modes, mtimes, rdevs, links, md5s, owners, groups|
+            with_tagdata?(Tag::FileStates, Tag::FileFlags) do |states, flags|
+              if states
+                # FileStates is stored in CHAR type, but we want
+                # integral values.
+                states.force_return_type!(TagData::ReturnTypeInt8)
+              end
+              Array(RPM::File).new(basenames.size) do |i|
+                basename = basenames[i].as(String)
+                diridx = diridxs[i].as(UInt32)
+                dirname = dirnames[diridx].as(String)
+                size = sizes[i].as(UInt32)
+                mode = modes[i].as(UInt16)
+                mtime = mtimes[i].as(UInt32)
+                rdev = rdevs[i].as(UInt16)
+                link = links[i].as(String)
+                md5 = md5s[i].as(String)
+                owner = owners[i].as(String)
+                group = groups[i].as(String)
+                state = if states
+                          FileState.from_value(states[i].as(UInt8).to_i8!)
+                        else
+                          FileState::NORMAL
+                        end
+                attr = if flags
+                         FileAttrs.from_value(flags[i].as(UInt32))
+                       else
+                         FileAttrs::NONE
+                       end
+                RPM::File.new(
+                  path: ::File.join(dirname, basename),
+                  md5sum: md5,
+                  link_to: link,
+                  size: size,
+                  mtime: Time.unix(mtime),
+                  owner: owner,
+                  group: group,
+                  mode: mode,
+                  attr: attr,
+                  state: state,
+                  rdev: rdev,
+                )
+              end
+            end
+          end
+        else
+          [] of RPM::File
+        end
       end
     end
 
     private def dependencies(klass : T.class, nametag : Tag, versiontag : Tag, flagtag : Tag) : Array(T) forall T
-      deps = [] of T
-
-      nametd = nil
-      versiontd = nil
-      flagtd = nil
-      begin
-        nametd = LibRPM.rpmtdNew
-        versiontd = LibRPM.rpmtdNew
-        flagtd = LibRPM.rpmtdNew
-
-        min = LibRPM::HeaderGetFlags::MINMEM
-
-        return deps if LibRPM.headerGet(@hdr, nametag, nametd, min) != 1
-        return deps if LibRPM.headerGet(@hdr, versiontag, versiontd, min) != 1
-        return deps if LibRPM.headerGet(@hdr, flagtag, flagtd, min) != 1
-
-        # LibRPM.rpmtdInit(nametd)
-        while LibRPM.rpmtdNext(nametd) != -1
-          deps << T.new(
-            String.new(LibRPM.rpmtdGetString(nametd)),
-            Version.new(String.new(LibRPM.rpmtdNextString(versiontd))),
-            Sense.from_value(LibRPM.rpmtdNextUint32(flagtd).value), self
-          )
+      with_tagdata?(nametag, versiontag, flagtag) do |nametd, versiontd, flagtd|
+        if nametd && versiontd && flagtd
+          Array(T).new(nametd.size) do |i|
+            name = nametd[i].as(String)
+            version = Version.new(versiontd[i].as(String))
+            sense = Sense.from_value(flagtd[i].as(UInt32))
+            T.new(name, version, sense, self)
+          end
+        else
+          [] of T
         end
-        deps
-      ensure
-        LibRPM.rpmtdFree(nametd) if nametd
-        LibRPM.rpmtdFree(versiontd) if versiontd
-        LibRPM.rpmtdFree(flagtd) if flagtd
       end
     end
 
@@ -187,81 +232,120 @@ module RPM
       dependencies(Conflict)
     end
 
-    private def get_tag_data(td : LibRPM::TagData, is_array : Bool,
-                             &block : -> T) : T | Array(T) forall T
-      if is_array
-        ret = [] of T
-        while LibRPM.rpmtdNext(td) != -1
-          ret << yield
+    # Get `TagData` for given `Tag`.
+    #
+    # Raises KeyError if the given tag is not found.
+    def get_tagdata(tag : Tag | TagValue, *, flag : LibRPM::HeaderGetFlags = LibRPM::HeaderGetFlags::MINMEM)
+      TagData.create do |ptr|
+        if LibRPM.headerGet(@hdr, tag, ptr, flag) == 0
+          raise KeyError.new("No entry for tag #{tag} found")
         end
-        ret
-      else
-        yield
+        1
       end
     end
 
-    def [](tag : DbiTag)
-      tag = Tag.from_value?(tag.value)
-      if tag
-        self.[tag.as(RPM::Tag)]
+    # Get `TagData` for given `Tag`
+    #
+    # Returns `nil` if the given tag is not found.
+    def get_tagdata?(tag : Tag | TagValue, *, flag : LibRPM::HeaderGetFlags = LibRPM::HeaderGetFlags::MINMEM)
+      TagData.create? do |ptr|
+        LibRPM.headerGet(@hdr, tag, ptr, flag)
+      end
+    end
+
+    # Get `TagData` for given `Tag`.
+    #
+    # Raises `TypeCastError` if the given tag is not valid for `Tag`.
+    # Raises `KeyError` if the given tag is not found.
+    def get_tagdata(tag : DbiTag, **opts)
+      ttag = Tag.from_value?(tag.value)
+      if ttag
+        get_tagdata(ttag, **opts)
+      else
+        raise TypeCastError.new("No Tag counterpart for DbiTag::#{tag}")
+      end
+    end
+
+    # Get `TagData` for given `Tag`
+    #
+    # Returns `nil` if the given tag is not found, or not valid tag.
+    def get_tagdata?(tag : DbiTag, **opts)
+      ttag = Tag.from_value?(tag.value)
+      if ttag
+        get_tagdata?(ttag, **opts)
       else
         nil
       end
     end
 
-    def [](tag : Tag | TagValue)
-      tagc = LibRPM.rpmtdNew
-      return nil if tagc.null?
-      begin
-        return nil if LibRPM.headerGet(@hdr, tag, tagc, LibRPM::HeaderGetFlags::MINMEM) == 0
-
-        type = LibRPM.rpmtdType(tagc)
-        count = LibRPM.rpmtdCount(tagc)
-        ret_type = RPM.tag_get_return_type(tag)
-
-        is_array = false
-        is_array = true if count > 1
-        is_array = true if ret_type == TagReturnType::ARRAY
-
-        case type
-        when TagType::INT8
-          get_tag_data(tagc, is_array) do
-            LibRPM.rpmtdGetNumber(tagc).to_u8
-          end
-        when TagType::CHAR
-          get_tag_data(tagc, is_array) do
-            LibRPM.rpmtdGetNumber(tagc).to_u8
-          end
-        when TagType::INT16
-          get_tag_data(tagc, is_array) do
-            LibRPM.rpmtdGetNumber(tagc).to_u16
-          end
-        when TagType::INT32
-          get_tag_data(tagc, is_array) do
-            LibRPM.rpmtdGetNumber(tagc).to_u32
-          end
-        when TagType::INT64
-          get_tag_data(tagc, is_array) do
-            LibRPM.rpmtdGetNumber(tagc).to_u64
-          end
-        when TagType::STRING
-          get_tag_data(tagc, is_array) do
-            String.new(LibRPM.rpmtdGetString(tagc))
-          end
-        when TagType::STRING_ARRAY
-          get_tag_data(tagc, true) do
-            String.new(LibRPM.rpmtdGetString(tagc))
-          end
-        when TagType::BIN
-          s = LibRPM.rpmtdFormat(tagc, LibRPM::TagDataFormat::BASE64, nil)
-          str = String.new(s)
-          LibC.free(s)
-          Base64.decode(str)
-        else
-          raise Exception.new("Don't know how to retrieve #{type}")
+    # Get `TagData`(s) for given `Tag`(s), yield them and then cleanup them.
+    #
+    # Returns the result of given block.
+    #
+    # Raises `KeyError` if one of `tags` is not found. In this case,
+    # the block will not be yielded.
+    def with_tagdata(*tags, &block)
+      tdata = tags.map do |tag|
+        begin
+          get_tagdata(tag)
+        rescue e : Exception
+          e
         end
+      end
+      begin
+        if ex = tdata.find { |x| x.is_a?(Exception) }
+          raise ex.as(Exception)
+        end
+        tdata_x = tdata.map do |td|
+          td.as(TagData)
+        end
+        yield(*tdata_x)
       ensure
-        LibRPM.rpmtdFree(tagc)
+        tdata.each do |td|
+          if td.is_a?(TagData)
+            td.finalize
+          end
+        end
+      end
+    end
+
+    # Get `TagData`(s) for given `Tag`(s), yield them and then cleanup them.
+    #
+    # Returns the result of given block.
+    #
+    # If some of `tags` are not found, this method pass `nil` for them.
+    def with_tagdata?(*tags, &block)
+      tdata = tags.map { |tag| get_tagdata?(tag) }
+      begin
+        yield(*tdata)
+      ensure
+        tdata.each do |td|
+          if td
+            td.finalize
+          end
+        end
+      end
+    end
+
+    # Get the value of given `Tag` directly.
+    #
+    # Raises `KeyError` if given `Tag` is not found.
+    def [](tag)
+      with_tagdata(tag) do |tg|
+        tg.value
+      end
+    end
+
+    # Get the value of given `Tag` directly.
+    #
+    # If given `Tag` is not found, returns `nil`.
+    def []?(tag)
+      with_tagdata?(tag) do |tg|
+        if tg
+          tg.value
+        else
+          nil
+        end
       end
     end
   end

@@ -168,7 +168,7 @@ describe RPM::TagData do
       data.value_array.should eq(["foo", "bar", "baz"])
       data.value.should eq(["foo", "bar", "baz"])
       data.base64.should eq("(not a blob)")
-      data.to_s.should eq(%(["foo", "bar", "baz"]))
+      data.to_s.should eq(%([foo, bar, baz]))
     end
 
     it "creates integer data" do
@@ -180,10 +180,10 @@ describe RPM::TagData do
       expect_raises(TypeCastError) do
         data.value_no_array
       end
-      data.value_array.should eq(Slice[1_u32, 2_u32])
-      data.value.should eq(Slice[1_u32, 2_u32])
+      data.value_array.should eq([1_u32, 2_u32])
+      data.value.should eq([1_u32, 2_u32])
       data.base64.should eq("(not a blob)")
-      data.to_s.should eq(%(["1", "2"]))
+      data.to_s.should eq(%([1, 2]))
     end
 
     it "creates binary data" do
@@ -231,13 +231,21 @@ describe RPM::Package do
 
     it "can provide TagData" do
       pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
-      tag = RPM::TagData.for(pkg.hdr, RPM::Tag::Arch)
-      tag.size.should eq(1)
-      tag[0].should eq("i586")
+      tag = pkg.get_tagdata(RPM::Tag::Arch)
+      begin
+        tag.size.should eq(1)
+        tag[0].should eq("i586")
+      ensure
+        tag.finalize
+      end
 
-      tag = RPM::TagData.for(pkg, RPM::Tag::Name)
-      tag.size.should eq(1)
-      tag[0].should eq("simple")
+      tag = pkg.get_tagdata(RPM::Tag::Name)
+      begin
+        tag.size.should eq(1)
+        tag[0].should eq("simple")
+      ensure
+        tag.finalize
+      end
     end
 
     it "has a name 'simple'" do
@@ -755,7 +763,7 @@ describe RPM::Transaction do
               n = pkg.name
               v = pkg[RPM::Tag::Version].as(String)
               r = pkg[RPM::Tag::Release].as(String)
-              e = pkg[RPM::Tag::Epoch].as(UInt32 | Nil)
+              e = pkg[RPM::Tag::Epoch]?.as(UInt32?)
               a = pkg[RPM::Tag::Arch].as(String)
               tup = {n, v, r, e, a}
               pkgs << tup
