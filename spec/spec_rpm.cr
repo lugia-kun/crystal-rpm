@@ -169,6 +169,7 @@ describe RPM::TagData do
       data.value.should eq(["foo", "bar", "baz"])
       data.base64.should eq("(not a blob)")
       data.to_s.should eq(%([foo, bar, baz]))
+      data[0].should eq("foo")
     end
 
     it "creates integer data" do
@@ -184,6 +185,7 @@ describe RPM::TagData do
       data.value.should eq([1_u32, 2_u32])
       data.base64.should eq("(not a blob)")
       data.to_s.should eq(%([1, 2]))
+      data[0].should eq(1_u32)
     end
 
     it "creates binary data" do
