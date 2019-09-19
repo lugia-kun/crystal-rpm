@@ -1223,7 +1223,7 @@ module RPM
 
   # Return Tag Type for a Tag
   #
-  # * Calls `rpmTagGetType()` for RPM 4.9 or later,
+  # * Calls `rpmTagType()` for RPM 4.9 or later,
   # * Calls `rpmTagGetType()` and mask for RPM 4.8
   def self.tag_type(v) : TagType
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}

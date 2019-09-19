@@ -55,7 +55,8 @@ module RPM
       # not, this method raises `TypeCastError`.
       def tag=(tag : Tag | TagValue)
         if LibRPM.rpmtdSetTag(@ptr, tag) == 0
-          raise TypeCastError.new("Incompatible tag value #{tag} for #{self.class}")
+          type = LibRPM.rpmtdType(@ptr)
+          raise TypeCastError.new("Incompatible tag value #{tag} for #{type}")
         end
         tag
       end
@@ -114,10 +115,17 @@ module RPM
       #
       # Raises `NilAssertionError` if `#fetch_ptr` returns `NULL`.
       def bytes : Slice(T)
+        bytes?.not_nil!
+      end
+
+      # Returns binary raw array of expecting type.
+      #
+      # Returns `nil` if `#fetch_ptr` returns `NULL`.
+      def bytes? : Slice(T)?
         self.pos = 0
         ptr = fetch_ptr
         if ptr.null?
-          raise NilAssertionError.new
+          nil
         else
           Slice(T).new(ptr, size, read_only: true)
         end
@@ -128,10 +136,14 @@ module RPM
       # This may be faster than `Indexable#to_a` (via
       # `Enumerable#to_a`).
       def to_a_from_bytes : Array(T)
-        b = bytes
-        Array(T).build(b.size) do |buffer|
-          b.copy_to(buffer, b.size)
-          b.size
+        b = bytes?
+        if b
+          Array(T).build(b.size) do |buffer|
+            b.copy_to(buffer, b.size)
+            b.size
+          end
+        else
+          [] of T
         end
       end
 
@@ -160,12 +172,7 @@ module RPM
 
       # :nodoc:
       def bytes
-        raise TypeCastError.new("Cannot take byte array of UInt8.")
-      end
-
-      # :nodoc:
-      def fetch_ptr
-        raise TypeCastError.new("Cannot fetch pointer of UInt8.")
+        raise TypeCastError.new("Cannot take byte array of UInt8")
       end
     end
 
@@ -250,12 +257,7 @@ module RPM
 
       # :nodoc:
       def bytes
-        raise TypeCastError.new("Cannot take byte array of string(s).")
-      end
-
-      # :nodoc:
-      def fetch_ptr
-        raise TypeCastError.new("Cannot fetch pointer of string type.")
+        raise TypeCastError.new("Cannot take byte array of string(s)")
       end
     end
 
@@ -334,11 +336,6 @@ module RPM
           (hex2bin(c1) << 4) | hex2bin(c2)
         end
       end
-
-      # :nodoc:
-      def fetch_ptr
-        raise TypeCastError.new("Cannot fetch pointer of binary type.")
-      end
     end
 
     @ptr : ReturnTypeBase
@@ -397,7 +394,7 @@ module RPM
       ptr = new_ptr
       begin
         if yield(ptr) == 0
-          raise TypeCastError.new("Failed to set tag data")
+          raise TypeCastError.new("Failed to set TagData")
         end
       rescue ex : Exception
         LibRPM.rpmtdFree(ptr)
@@ -547,22 +544,16 @@ module RPM
     # Returns the single value of tag data
     #
     # If tag data contains array, raises `TypeCastError`.
+    # If tag data is not set, raises `IndexError` (because this
+    # methods just get the value at index 0).
     def value_no_array
-      type = self.type
-      count = self.size
-      ret_type = self.return_type
-
-      if count < 1
-        raise TypeCastError.new("Empry TagData")
-      end
-
       # BIN is stored in array of UInt8. Treating specially
       if @ptr.is_a?(ReturnTypeBin)
         return @ptr.bytes
       end
 
-      if is_array?(type, count, ret_type)
-        raise TypeCastError.new("RPM::TagData is stored in array (has #{count} values)")
+      if is_array?
+        raise TypeCastError.new("RPM::TagData is stored in array")
       end
 
       @ptr[0]
@@ -570,11 +561,18 @@ module RPM
 
     # Returns the single value of tag data
     #
-    # If tag data contains array, returns nil.
+    # If tag data contains array or not set, returns nil.
     def value_no_array?
-      value_no_array
-    rescue TypeCastError
-      nil
+      # BIN is stored in array of UInt8. Treating specially
+      if @ptr.is_a?(ReturnTypeBin)
+        return @ptr.bytes
+      end
+
+      if is_array?
+        return nil
+      end
+
+      @ptr[0]?
     end
 
     # Returns the value in array.
@@ -582,21 +580,13 @@ module RPM
     # It raises `TypeCastError` if the tag data stores single value
     # only.
     def value_array
-      type = self.type
-      count = self.size
-      ret_type = self.return_type
-
-      if count < 1
-        return TypeCastError.new("Empty TagData")
-      end
-
       # BIN is stored in array of UInt8. Treating specially
       if @ptr.is_a?(ReturnTypeBin)
         return @ptr.bytes
       end
 
-      if !is_array?(type, count, ret_type)
-        raise TypeCastError.new("RPM::TagData is stored in plain data")
+      if !is_array?
+        raise TypeCastError.new("RPM::TagData stores non-array data")
       end
 
       @ptr.to_a
@@ -606,25 +596,41 @@ module RPM
     #
     # It returns nil if the tag data stores single value only.
     def value_array?
-      value_array
-    rescue TypeCastError
-      nil
+      if @ptr.is_a?(ReturnTypeBin)
+        return @ptr.bytes
+      end
+
+      if !is_array?
+        return nil
+      end
+
+      @ptr.to_a
     end
 
     # Returns the value.
     def value
+      if @ptr.is_a?(ReturnTypeBin)
+        return @ptr.bytes
+      end
+
       if is_array?
-        value_array
+        @ptr.to_a
       else
-        value_no_array
+        @ptr[0]
       end
     end
 
     # Returns the value.
     def value?
-      value
-    rescue TypeCastError
-      nil
+      if @ptr.is_a?(ReturnTypeBin)
+        return @ptr.bytes
+      end
+
+      if is_array?
+        @ptr.to_a
+      else
+        @ptr[0]?
+      end
     end
 
     def finalize
@@ -632,8 +638,17 @@ module RPM
     end
 
     # Returns the value of given array index.
+    #
+    # Raises IndexError if `idx` is out-of-range.
     def [](idx)
       @ptr[idx]
+    end
+
+    # Returns the value of given array index.
+    #
+    # Returns `nil` if `idx` is out-of-range.
+    def []?(idx)
+      @ptr[idx]?
     end
 
     # Returns the BASE64 representation of tag data.
