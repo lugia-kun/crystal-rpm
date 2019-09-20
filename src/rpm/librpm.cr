@@ -947,6 +947,7 @@ module RPM
     fun rpmtdGetString(TagData) : Pointer(UInt8)
     fun rpmtdGetNumber(TagData) : UInt64
 
+    fun rpmtdSetTag(TagData, TagVal) : Int
     fun rpmtdFromUint8(TagData, TagVal, UInt8*, Count) : Int
     fun rpmtdFromUint16(TagData, TagVal, UInt16*, Count) : Int
     fun rpmtdFromUint32(TagData, TagVal, UInt32*, Count) : Int
@@ -1177,6 +1178,8 @@ module RPM
   alias FileAttrs = LibRPM::FileAttrs
   alias CallbackType = LibRPM::CallbackType
 
+  alias TagDataFormat = LibRPM::TagDataFormat
+
   alias Sense = LibRPM::Sense
   alias TransactionFlags = LibRPM::TransFlags
   alias MireMode = LibRPM::MireMode
@@ -1220,7 +1223,7 @@ module RPM
 
   # Return Tag Type for a Tag
   #
-  # * Calls `rpmTagGetType()` for RPM 4.9 or later,
+  # * Calls `rpmTagType()` for RPM 4.9 or later,
   # * Calls `rpmTagGetType()` and mask for RPM 4.8
   def self.tag_type(v) : TagType
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
