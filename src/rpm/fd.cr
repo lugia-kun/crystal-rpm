@@ -1,6 +1,6 @@
 module RPM
   class FileDescriptor
-    getter fd : LibRPM::FD
+    @fd : LibRPM::FD
     @open : Bool
 
     def self.open(file, mode)
@@ -39,6 +39,11 @@ module RPM
 
     def finalize
       close
+    end
+
+    # Returns pointer to `FD_t` to deal with librpm C API directly.
+    def to_unsafe
+      @fd
     end
   end
 end

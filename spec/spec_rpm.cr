@@ -1255,35 +1255,10 @@ describe RPM::Problem do
     end
   end
 
-  describe ".new from Existing pointer" do
-    it "has same key" do
-      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-      problem2 = RPM::Problem.new(problem.ptr)
-      problem2.key.should eq(problem.key)
-    end
-
-    it "has same type" do
-      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-      problem2 = RPM::Problem.new(problem.ptr)
-      problem2.type.should eq(problem.type)
-    end
-
-    it "has same str" do
-      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-      problem2 = RPM::Problem.new(problem.ptr)
-      problem2.str.should eq(problem.str)
-    end
-
-    it "has same description" do
-      problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-      problem2 = RPM::Problem.new(problem.ptr)
-      problem2.to_s.should eq(problem.to_s)
-    end
-
+  describe "#dup" do
     it "can duplicate" do
       problem = RPM::Problem.new(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-      problem2 = RPM::Problem.new(problem.ptr)
-      d = problem2.dup
+      d = problem.dup
       d.key.should eq(problem.key)
     end
   end

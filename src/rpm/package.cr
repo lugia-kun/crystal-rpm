@@ -14,7 +14,7 @@ module RPM
   end
 
   class Package
-    getter hdr : LibRPM::Header
+    @hdr : LibRPM::Header
 
     # Creates a new package header with given name and version
     def self.create(name : String, version : Version)
@@ -347,6 +347,11 @@ module RPM
           nil
         end
       end
+    end
+
+    # Returns pointer to `header` to deal with librpm C API directly.
+    def to_unsafe
+      @hdr
     end
   end
 end

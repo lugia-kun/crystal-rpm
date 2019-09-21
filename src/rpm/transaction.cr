@@ -210,7 +210,7 @@ module RPM
     # will be raised when some error occured.
     def delete_by_iterator(iter : MatchIterator)
       iter.each do |header|
-        ret = LibRPM.rpmtsAddEraseElement(@ptr, header.hdr, iter.offset)
+        ret = LibRPM.rpmtsAddEraseElement(@ptr, header, iter.offset)
         raise TransactionError.new("Error while adding erase to transaction") if ret != 0
       end
     end
@@ -302,7 +302,7 @@ module RPM
       raise Exception.new("key #{key} must be unique") if @keys.includes?(key)
       @keys << key
 
-      ret = LibRPM.rpmtsAddInstallElement(@ptr, pkg.hdr, key, upgrade, nil)
+      ret = LibRPM.rpmtsAddInstallElement(@ptr, pkg, key, upgrade, nil)
       raise TransactionError.new("Failed add install element") if ret != 0
       nil
     end
@@ -375,7 +375,7 @@ module RPM
             end
             fdt = FileDescriptor.for_fd(ino)
             boxed.fdt = fdt
-            fdt.fd.as(Pointer(Void))
+            fdt.to_unsafe.as(Pointer(Void))
           when CallbackType::INST_CLOSE_FILE
             if boxed.fdt
               fd = boxed.fdt.as(FileDescriptor)
@@ -454,6 +454,11 @@ module RPM
     # different by RPM version.
     def commit(&block : Callback)
       commit(block)
+    end
+
+    # Returns pointer to `rpmts` to
+    def to_unsafe
+      @ptr
     end
   end
 
