@@ -898,6 +898,7 @@ module RPM
       DISKSPACE
       DISKNODES
       OBSOLETES
+      VERIFY
     end
 
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
@@ -913,6 +914,9 @@ module RPM
     fun rpmProblemGetStr(Problem) : Pointer(UInt8)
     fun rpmProblemString(Problem) : Pointer(UInt8)
     fun rpmProblemCompare(Problem, Problem) : Int
+    fun rpmProblemGetPkgNEVR(Problem) : Pointer(UInt8)
+    fun rpmProblemGetAltNEVR(Problem) : Pointer(UInt8)
+    fun rpmProblemGetDiskNeed(Problem) : Loff
 
     # ## Problem Set APIs.
 
@@ -1192,36 +1196,6 @@ module RPM
 
   alias BuildPkgFlags = LibRPM::BuildPkgFlags
   alias BuildFlags = LibRPM::BuildFlags
-
-  # Create a problem with RPM 4.9 or later calling convention
-  def self.problem_create(type, pkg_nevr, key, alt_nevr, str, number)
-    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-      case type
-      when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
-        pkg_nevr, str, alt_nevr = alt_nevr, pkg_nevr, "  " + str
-        number = (number == 0) ? 1 : 0
-      end
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, nil, str, alt_nevr, number)
-    {% else %}
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
-    {% end %}
-  end
-
-  # Create a problem with RPM 4.8.x calling convention
-  def self.problem_create(type, pkg_nevr, key, dir, file, alt_nevr, number)
-    {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, dir, file, alt_nevr, number)
-    {% else %}
-      str = dir || ""
-      str += file if file
-      case type
-      when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
-        str, alt_nevr, pkg_nevr = alt_nevr[2..-1], pkg_nevr, str
-        number = (number != 0) ? 0 : 1
-      end
-      LibRPM.rpmProblemCreate(type, pkg_nevr, key, alt_nevr, str, number)
-    {% end %}
-  end
 
   # Return Tag Type for a Tag
   #
