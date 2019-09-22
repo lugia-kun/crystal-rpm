@@ -1118,7 +1118,7 @@ describe RPM::Package do
       pkg[RPM::Tag::SigMD5].should eq(Bytes[0x3b, 0x5f, 0x9d, 0x46, 0x8c, 0x87, 0x71, 0x66, 0x53, 0x2c, 0x66, 0x2e, 0x29, 0xf4, 0x3b, 0xc3])
     end
 
-    it "contains 2 files ownd by root" do
+    it "contains 2 files owned by root" do
       pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg[RPM::Tag::FileUserName].should eq(%w[root root])
     end
@@ -1276,6 +1276,39 @@ describe RPM::Transaction do
       RPM.transaction do |ts|
         ts.root_dir = Dir.tempdir
         ts.root_dir.should eq(Dir.tempdir + "/")
+      end
+    end
+  end
+
+  describe "#read_package_file" do
+    it "can read a package" do
+      RPM.transaction do |ts|
+        pkg = ts.read_package_file(fixture("simple-1.0-0.noarch.rpm"))
+      end
+    end
+
+    it "raises file error" do
+      RPM.transaction do |ts|
+        # We are not expected a specific message.
+        expect_raises(Exception) do
+          ts.read_package_file(fixture("non-existent-file"))
+        end
+      end
+    end
+
+    it "raises TransactionError for reading package" do
+      RPM.transaction do |ts|
+        path = fixture("broken-rpm-1-0.i586.rpm")
+        expect_raises(RPM::TransactionError, "Failed to read package: #{path}: not found") do
+          ts.read_package_file(path)
+        end
+      end
+
+      RPM.transaction do |ts|
+        path = fixture("broken-rpm-2-0.i586.rpm")
+        expect_raises(RPM::TransactionError, "Failed to read package: #{path}: failed") do
+          ts.read_package_file(path)
+        end
       end
     end
   end
