@@ -1174,6 +1174,8 @@ module RPM
   alias TagReturnType = LibRPM::TagReturnType
   alias DbiTag = LibRPM::DbiTag
   alias DbiTagValue = LibRPM::DbiTagVal
+  alias HeaderGetFlags = LibRPM::HeaderGetFlags
+  alias HeaderPutFlags = LibRPM::HeaderPutFlags
   alias FileState = LibRPM::FileState
   alias FileAttrs = LibRPM::FileAttrs
   alias CallbackType = LibRPM::CallbackType

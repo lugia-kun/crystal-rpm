@@ -235,9 +235,9 @@ module RPM
     # Get `TagData` for given `Tag`.
     #
     # Raises KeyError if the given tag is not found.
-    def get_tagdata(tag : Tag | TagValue, *, flag : LibRPM::HeaderGetFlags = LibRPM::HeaderGetFlags::MINMEM)
+    def get_tagdata(tag : Tag | TagValue, *, flags : HeaderGetFlags = HeaderGetFlags::MINMEM)
       TagData.create do |ptr|
-        if LibRPM.headerGet(@hdr, tag, ptr, flag) == 0
+        if LibRPM.headerGet(@hdr, tag, ptr, flags) == 0
           raise KeyError.new("No entry for tag #{tag} found")
         end
         1
@@ -247,9 +247,9 @@ module RPM
     # Get `TagData` for given `Tag`
     #
     # Returns `nil` if the given tag is not found.
-    def get_tagdata?(tag : Tag | TagValue, *, flag : LibRPM::HeaderGetFlags = LibRPM::HeaderGetFlags::MINMEM)
+    def get_tagdata?(tag : Tag | TagValue, *, flags : HeaderGetFlags = HeaderGetFlags::MINMEM)
       TagData.create? do |ptr|
-        LibRPM.headerGet(@hdr, tag, ptr, flag)
+        LibRPM.headerGet(@hdr, tag, ptr, flags)
       end
     end
 
@@ -284,10 +284,10 @@ module RPM
     #
     # Raises `KeyError` if one of `tags` is not found. In this case,
     # the block will not be yielded.
-    def with_tagdata(*tags, &block)
+    def with_tagdata(*tags, **opts, &block)
       tdata = tags.map do |tag|
         begin
-          get_tagdata(tag)
+          get_tagdata(tag, **opts)
         rescue e : Exception
           e
         end
@@ -314,8 +314,8 @@ module RPM
     # Returns the result of given block.
     #
     # If some of `tags` are not found, this method pass `nil` for them.
-    def with_tagdata?(*tags, &block)
-      tdata = tags.map { |tag| get_tagdata?(tag) }
+    def with_tagdata?(*tags, **opts, &block)
+      tdata = tags.map { |tag| get_tagdata?(tag, **opts) }
       begin
         yield(*tdata)
       ensure
@@ -331,7 +331,7 @@ module RPM
     #
     # Raises `KeyError` if given `Tag` is not found.
     def [](tag)
-      with_tagdata(tag) do |tg|
+      with_tagdata(tag, flags: HeaderGetFlags.flags(MINMEM, EXT)) do |tg|
         tg.value
       end
     end
@@ -340,7 +340,7 @@ module RPM
     #
     # If given `Tag` is not found, returns `nil`.
     def []?(tag)
-      with_tagdata?(tag) do |tg|
+      with_tagdata?(tag, flags: HeaderGetFlags.flags(MINMEM, EXT)) do |tg|
         if tg
           tg.value
         else
