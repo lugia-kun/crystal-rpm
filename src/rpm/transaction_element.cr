@@ -147,7 +147,8 @@ struct RPM::Transaction::Element
     LibRPM.rpmteFailed(@ptr) != 0
   end
 
-  private def ptr
+  # Returns pointer to `rpmte` to deal with librpm C API directly
+  def to_unsafe
     @ptr
   end
 end

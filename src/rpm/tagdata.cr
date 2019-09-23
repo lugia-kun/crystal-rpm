@@ -704,5 +704,10 @@ module RPM
       @ptr = type.new(@ptr)
       cls
     end
+
+    # Returns pointer to `rpmtd` to deal with librpm C API directly.
+    def to_unsafe
+      @ptr.to_unsafe
+    end
   end
 end

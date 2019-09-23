@@ -62,5 +62,10 @@ module RPM
     def version(*args)
       set_iterator_version(*args)
     end
+
+    # Returns pointer to `rpmdbMatchIterator` to deal with librpm C API directly
+    def to_unsafe
+      @ptr
+    end
   end
 end

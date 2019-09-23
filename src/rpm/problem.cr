@@ -57,7 +57,7 @@ module RPM
   #
   class Problem
     @need_gc : Bool = true
-    property ptr : LibRPM::Problem
+    @ptr : LibRPM::Problem
 
     def finalize
       if @need_gc
@@ -123,7 +123,12 @@ module RPM
     end
 
     def <=>(other)
-      LibRPM.rpmProblemCompare(@ptr, other.ptr)
+      LibRPM.rpmProblemCompare(@ptr, other.@ptr)
+    end
+
+    # Returns pointer to `rpmProblem` to deal with librpm C API directly
+    def to_unsafe
+      @ptr
     end
   end
 
@@ -147,24 +152,29 @@ module RPM
     def finalize
       @iter = LibRPM.rpmpsFreeIterator(@iter)
     end
+
+    # Returns pointer to `rpmpsi` to deal with librpm C API directly
+    def to_unsafe
+      @iter
+    end
   end
 
   # Set of Problems
   class ProblemSet
     include Iterable(Problem)
 
-    property ptr : LibRPM::ProblemSet
+    @ptr : LibRPM::ProblemSet
 
     def initialize(@ptr)
     end
 
     def each
-      iter = LibRPM.rpmpsInitIterator(self.ptr)
+      iter = LibRPM.rpmpsInitIterator(@ptr)
       ProblemSetIterator.new(self, iter)
     end
 
     def each(&block)
-      iter = LibRPM.rpmpsInitIterator(self.ptr)
+      iter = LibRPM.rpmpsInitIterator(@ptr)
       begin
         while LibRPM.rpmpsNextIterator(iter) >= 0
           yield Problem.new(LibRPM.rpmpsGetProblem(iter))
@@ -178,6 +188,11 @@ module RPM
       unless @ptr.null?
         @ptr = LibRPM.rpmpsFree(@ptr)
       end
+    end
+
+    # Returns pointer to `rpmps` to deal with librpm C API directly
+    def to_unsafe
+      @ptr
     end
   end
 end
