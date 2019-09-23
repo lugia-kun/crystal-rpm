@@ -182,7 +182,7 @@ module RPM
       include ReturnTypeModule
 
       # :nodoc:
-      def fetch_ptr
+      def fetch_ptr : Pointer(UInt16)
         LibRPM.rpmtdGetUint16(@ptr)
       end
 
@@ -203,7 +203,7 @@ module RPM
       include ReturnTypeModule
 
       # :nodoc:
-      def fetch_ptr
+      def fetch_ptr : Pointer(UInt32)
         LibRPM.rpmtdGetUint32(@ptr)
       end
 
@@ -224,7 +224,7 @@ module RPM
       include ReturnTypeModule
 
       # :nodoc:
-      def fetch_ptr
+      def fetch_ptr : Pointer(UInt64)
         LibRPM.rpmtdGetUint64(@ptr)
       end
 
@@ -289,7 +289,7 @@ module RPM
       end
 
       # :nodoc:
-      def fetch_ptr
+      def fetch_ptr : Pointer(UInt8)
         LibRPM.rpmtdGetChar(@ptr)
       end
     end
