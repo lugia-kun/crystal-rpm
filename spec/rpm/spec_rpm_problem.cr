@@ -45,7 +45,7 @@ describe RPM::Problem do
       problem.class.should eq(RPM::Problem::Requires)
 
       problem = RPM::Problem.create(RPM::ProblemType::CONFLICT, "", "", "", "", 0)
-      problem.class.should eq(RPM::Problem::Conflict)
+      problem.class.should eq(RPM::Problem::Conflicts)
 
       problem = RPM::Problem.create(RPM::ProblemType::OBSOLETES, "", "", "", "", 0)
       problem.class.should eq(RPM::Problem::Obsoletes)
@@ -54,9 +54,8 @@ describe RPM::Problem do
       problem.class.should eq(RPM::Problem::Verify)
     end
 
-    pending "returns the instance of Problem if proper subclass not available" do
-      # Crystal does not allow to generate enum value of not available
-      problem = RPM::Problem.create(RPM::ProblemType.from_value(-1), "", "", "", "", 0)
+    it "returns the instance of Problem if proper subclass not available" do
+      problem = RPM::Problem.create(RPM::ProblemType.new(-1), "", "", "", "", 0)
       problem.class.should eq(RPM::Problem)
     end
   end
@@ -222,6 +221,13 @@ describe RPM::Problem do
     it "returns nil if str is not set" do
       problem = RPM::Problem.create(RPM::ProblemType::OLDPACKAGE, "bar-1.0-0", "", nil, nil, 0)
       problem.str?.should be_nil
+    end
+  end
+
+  describe "#number" do
+    it "returns `number` data of RPM Problem" do
+      problem = RPM::Problem.create(RPM::ProblemType::OLDPACKAGE, "bar-1.0-0", "", nil, nil, 11)
+      problem.number.should eq(11_u64)
     end
   end
 
@@ -625,6 +631,331 @@ describe RPM::Problem::FileConflict do
 
       obj = RPM::Problem::FileConflict.for("a-1.0-0", pkg2, "/foo/baz3")
       obj.to_s.should eq("file /foo/baz3 from install of a-1.0-0 conflicts with file from package simple_with_deps-1.0-0")
+    end
+  end
+end
+
+describe RPM::Problem::OldPackage do
+  describe ".for" do
+    it "creates OLD_PACKAGE problem" do
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", "b-1.0-0")
+      obj.class.should eq(RPM::Problem::OldPackage)
+    end
+
+    it "creates OLD_PACKAGE problem from package" do
+      pkg1 = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      pkg2 = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      obj = RPM::Problem::OldPackage.for(pkg1, pkg2)
+      obj.class.should eq(RPM::Problem::OldPackage)
+
+      obj = RPM::Problem::OldPackage.for(pkg1, "b-1.0-0")
+      obj.class.should eq(RPM::Problem::OldPackage)
+
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", pkg2)
+      obj.class.should eq(RPM::Problem::OldPackage)
+    end
+  end
+
+  describe "#installed_package" do
+    it "returns installed package NEVR which has problem" do
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", "b-1.0-0")
+      obj.installed_package.should eq("a-1.0-0")
+
+      pkg1 = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      pkg2 = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      obj = RPM::Problem::OldPackage.for(pkg1, pkg2)
+      obj.installed_package.should eq("simple-1.0-0")
+
+      obj = RPM::Problem::OldPackage.for(pkg1, "b-1.0-0")
+      obj.installed_package.should eq("simple-1.0-0")
+
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", pkg2)
+      obj.installed_package.should eq("a-1.0-0")
+    end
+  end
+
+  describe "#installing_package" do
+    it "returns installing package NEVR which has problem" do
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", "b-1.0-0")
+      obj.installing_package.should eq("b-1.0-0")
+
+      pkg1 = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      pkg2 = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      obj = RPM::Problem::OldPackage.for(pkg1, pkg2)
+      obj.installing_package.should eq("simple_with_deps-1.0-0")
+
+      obj = RPM::Problem::OldPackage.for(pkg1, "b-1.0-0")
+      obj.installing_package.should eq("b-1.0-0")
+
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", pkg2)
+      obj.installing_package.should eq("simple_with_deps-1.0-0")
+    end
+  end
+
+  describe "#to_s" do
+    it "returns problem representation" do
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", "b-1.0-0")
+      obj.to_s.should eq("package b-1.0-0 (which is newer than a-1.0-0) is already installed")
+
+      pkg1 = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      pkg2 = RPM::Package.open(fixture("simple_with_deps-1.0-0.i586.rpm"))
+      obj = RPM::Problem::OldPackage.for(pkg1, pkg2)
+      obj.to_s.should eq("package simple_with_deps-1.0-0 (which is newer than simple-1.0-0) is already installed")
+
+      obj = RPM::Problem::OldPackage.for(pkg1, "b-1.0-0")
+      obj.to_s.should eq("package b-1.0-0 (which is newer than simple-1.0-0) is already installed")
+
+      obj = RPM::Problem::OldPackage.for("a-1.0-0", pkg2)
+      obj.to_s.should eq("package simple_with_deps-1.0-0 (which is newer than a-1.0-0) is already installed")
+    end
+  end
+end
+
+describe RPM::Problem::Requires do
+  describe ".for" do
+    it "creates REQUIRES problem" do
+      obj = RPM::Problem::Requires.for("package-1.0-0", "foobar", false)
+      obj.class.should eq(RPM::Problem::Requires)
+    end
+
+    it "creates REQUIRES problem from package" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Requires.for(pkg, "foobaz", false)
+      obj.class.should eq(RPM::Problem::Requires)
+    end
+  end
+
+  describe "#package" do
+    it "returns pacakge NEVR which has problem" do
+      obj = RPM::Problem::Requires.for("package-1.0-0", "foobar", false)
+      obj.package.should eq("package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Requires.for(pkg, "foobaz", true)
+      obj.package.should eq("simple-1.0-0")
+    end
+  end
+
+  describe "#what_required" do
+    it "returns the required object name" do
+      obj = RPM::Problem::Requires.for("package-1.0-0", "foobar", false)
+      obj.what_required.should eq("foobar")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Requires.for(pkg, "foobaz", true)
+      obj.what_required.should eq("foobaz")
+    end
+  end
+
+  describe "#installed?" do
+    it "returns boolean which indicates the package in question is installed or is installing" do
+      obj = RPM::Problem::Requires.for("package-1.0-0", "foobar", false)
+      obj.installed?.should be_false
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Requires.for(pkg, "foobaz", true)
+      obj.installed?.should be_true
+    end
+  end
+
+  describe "#to_s" do
+    it "returns problem representation" do
+      obj = RPM::Problem::Requires.for("package-1.0-0", "foobar", false)
+      obj.to_s.should eq("foobar is needed by package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Requires.for(pkg, "foobaz", true)
+      obj.to_s.should eq("foobaz is needed by (installed) simple-1.0-0")
+    end
+  end
+end
+
+describe RPM::Problem::Conflicts do
+  describe ".for" do
+    it "creates CONFLICT problem" do
+      obj = RPM::Problem::Conflicts.for("package-1.0-0", "foobar", false)
+      obj.class.should eq(RPM::Problem::Conflicts)
+    end
+
+    it "creates CONFLICT problem from package" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Conflicts.for(pkg, "foobaz", false)
+      obj.class.should eq(RPM::Problem::Conflicts)
+    end
+  end
+
+  describe "#package" do
+    it "returns pacakge NEVR which has problem" do
+      obj = RPM::Problem::Conflicts.for("package-1.0-0", "foobar", false)
+      obj.package.should eq("package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Conflicts.for(pkg, "foobaz", true)
+      obj.package.should eq("simple-1.0-0")
+    end
+  end
+
+  describe "#what_conflicts" do
+    it "returns the required object name" do
+      obj = RPM::Problem::Conflicts.for("package-1.0-0", "foobar", false)
+      obj.what_conflicts.should eq("foobar")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Conflicts.for(pkg, "foobaz", true)
+      obj.what_conflicts.should eq("foobaz")
+    end
+  end
+
+  describe "#installed?" do
+    it "returns boolean which indicates the package in question is installed or is installing" do
+      obj = RPM::Problem::Conflicts.for("package-1.0-0", "foobar", false)
+      obj.installed?.should be_false
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Conflicts.for(pkg, "foobaz", true)
+      obj.installed?.should be_true
+    end
+  end
+
+  describe "#to_s" do
+    it "returns problem representation" do
+      obj = RPM::Problem::Conflicts.for("package-1.0-0", "foobar", false)
+      obj.to_s.should eq("foobar conflicts with package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Conflicts.for(pkg, "foobaz", true)
+      obj.to_s.should eq("foobaz conflicts with (installed) simple-1.0-0")
+    end
+  end
+end
+
+describe RPM::Problem::Obsoletes do
+  describe ".for" do
+    it "creates CONFLICT problem" do
+      obj = RPM::Problem::Obsoletes.for("package-1.0-0", "foobar", false)
+      obj.class.should eq(RPM::Problem::Obsoletes)
+    end
+
+    it "creates CONFLICT problem from package" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Obsoletes.for(pkg, "foobaz", false)
+      obj.class.should eq(RPM::Problem::Obsoletes)
+    end
+  end
+
+  describe "#package" do
+    it "returns pacakge NEVR which has problem" do
+      obj = RPM::Problem::Obsoletes.for("package-1.0-0", "foobar", false)
+      obj.package.should eq("package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Obsoletes.for(pkg, "foobaz", true)
+      obj.package.should eq("simple-1.0-0")
+    end
+  end
+
+  describe "#what_obsoletes" do
+    it "returns the required object name" do
+      obj = RPM::Problem::Obsoletes.for("package-1.0-0", "foobar", false)
+      obj.what_obsoletes.should eq("foobar")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Obsoletes.for(pkg, "foobaz", true)
+      obj.what_obsoletes.should eq("foobaz")
+    end
+  end
+
+  describe "#installed?" do
+    it "returns boolean which indicates the package in question is installed or is installing" do
+      obj = RPM::Problem::Obsoletes.for("package-1.0-0", "foobar", false)
+      obj.installed?.should be_false
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Obsoletes.for(pkg, "foobaz", true)
+      obj.installed?.should be_true
+    end
+  end
+
+  describe "#to_s" do
+    it "returns problem representation" do
+      obj = RPM::Problem::Obsoletes.for("package-1.0-0", "foobar", false)
+      str = {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 %}
+              "foobar is obsoleted by package-1.0-0"
+            {% else %}
+              "unknown error 11 encountered while manipulating package package-1.0-0"
+            {% end %}
+      obj.to_s.should eq(str)
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Obsoletes.for(pkg, "foobaz", true)
+      str = {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 %}
+              "foobaz is obsoleted by (installed) simple-1.0-0"
+            {% else %}
+              "unknown error 11 encountered while manipulating package simple-1.0-0"
+            {% end %}
+      obj.to_s.should eq(str)
+    end
+  end
+end
+
+describe RPM::Problem::Verify do
+  describe ".for" do
+    it "creates VERIFY problem" do
+      obj = RPM::Problem::Verify.for("package-1.0-0", "foobar")
+      obj.class.should eq(RPM::Problem::Verify)
+    end
+
+    it "creates VERIFY problem from package" do
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Verify.for(pkg, "foobaz")
+      obj.class.should eq(RPM::Problem::Verify)
+    end
+  end
+
+  describe "#package" do
+    it "returns pacakge NEVR which has problem" do
+      obj = RPM::Problem::Verify.for("package-1.0-0", "foobar")
+      obj.package.should eq("package-1.0-0")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Verify.for(pkg, "foobaz")
+      obj.package.should eq("simple-1.0-0")
+    end
+  end
+
+  describe "content" do
+    it "returns the content what failed to verify" do
+      obj = RPM::Problem::Verify.for("package-1.0-0", "foobar")
+      obj.content.should eq("foobar")
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Verify.for(pkg, "foobaz")
+      obj.content.should eq("foobaz")
+    end
+  end
+
+  describe "#to_s" do
+    it "returns problem representation" do
+      obj = RPM::Problem::Verify.for("package-1.0-0", "foobar")
+      str = {% if compare_versions(RPM::PKGVERSION_COMP, "4.14.2") >= 0 %}
+              "package package-1.0-0 does not verify: foobar"
+            {% elsif compare_versions(RPM::PKGVERSION_COMP, "4.14.1") >= 0 %}
+              "unknown error 11 encountered while manipulating package package-1.0-0"
+            {% else %}
+              "unknown error 12 encountered while manipulating package package-1.0-0"
+            {% end %}
+      obj.to_s.should eq(str)
+
+      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+      obj = RPM::Problem::Verify.for(pkg, "foobaz")
+      str = {% if compare_versions(RPM::PKGVERSION_COMP, "4.14.2") >= 0 %}
+              "package simple-1.0-0 does not verify: foobaz"
+            {% elsif compare_versions(RPM::PKGVERSION_COMP, "4.14.1") >= 0 %}
+              "unknown error 11 encountered while manipulating package simple-1.0-0"
+            {% else %}
+              "unknown error 12 encountered while manipulating package simple-1.0-0"
+            {% end %}
+      obj.to_s.should eq(str)
     end
   end
 end
