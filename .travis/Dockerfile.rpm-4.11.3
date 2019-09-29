@@ -1,4 +1,6 @@
 From centos:7 AS rpm-4.11.3
+ARG CRYSTAL_VERSION
 RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
 RUN yum install -y rpm-build rpm-devel crystal which pkgconfig
+RUN test $(crystal eval "puts Crystal::VERSION") == ${CRYSTAL_VERSION}
 WORKDIR /work

@@ -1,6 +1,9 @@
 FROM centos:6 AS rpm-4.8.0
-RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
-RUN yum install -y rpm-devel rpm-build crystal
-RUN rpm -e --nodeps libevent libevent-devel libevent-headers libevent-doc
-RUN yum install -y libevent2 libevent2-devel
+ARG CRYSTAL_VERSION
+ARG CRYSTAL_RELEASE=1
+WORKDIR /opt
+RUN yum install -y gcc xz rpm-devel rpm-build
+RUN curl -LO https://github.com/lugia-kun/crystal-for-legacy-dist/releases/download/${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.sles11.x86_64.tar.xz
+RUN xz -dc crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.sles11.x86_64.tar.xz | tar -xf -
+ENV PATH=/opt/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}/bin:$PATH
 WORKDIR /work

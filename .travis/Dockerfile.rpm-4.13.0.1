@@ -1,4 +1,6 @@
 FROM fedora:26 AS rpm-4.13.0.1
+ARG CRYSTAL_VERSION
 RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
 RUN dnf install -y rpm-build rpm-devel crystal which --disablerepo updates
+RUN test $(crystal eval "puts Crystal::VERSION") == ${CRYSTAL_VERSION}
 WORKDIR /work

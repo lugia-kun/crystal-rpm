@@ -27,7 +27,7 @@ env:
   - RPMVERSION=opensuse # OpenSUSE's rpm behave differently...
 
 before_install:
-  - docker build -t $RPMVERSION --target=$RPMVERSION -f .travis/Dockerfile.$RPMVERSION .
+  - docker build -t $RPMVERSION --target=$RPMVERSION --build-arg CRYSTAL_VERSION=$(crystal eval "puts Crystal::VERSION") -f .travis/Dockerfile.$RPMVERSION .
 
 script:
   - docker run -v $(pwd):/work -w /work $RPMVERSION ./.travis.sh
