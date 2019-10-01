@@ -1,6 +1,13 @@
-FROM fedora:27 AS rpm-4.14.1
+FROM fedora:27 AS rpm-4.14.1-o
+ARG COMMIT_ID
+ENV COMMIT_ID=${COMMIT_ID}
 ARG CRYSTAL_VERSION
-RUN curl https://dist.crystal-lang.org/rpm/setup.sh | bash
-RUN dnf install -y rpm-build rpm-devel crystal which
-RUN test $(crystal eval "puts Crystal::VERSION") == ${CRYSTAL_VERSION}
+ARG CRYSTAL_RELEASE=1
+ENV CRYSTAL_ARCHIVE=https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.x86_64.rpm
+RUN dnf install -y rpm-build rpm-devel which curl && \
+    curl -LO "${CRYSTAL_ARCHIVE}" && \
+    dnf install -y $(rpm -qp $(basename "${CRYSTAL_ARCHIVE}") --requires | grep -v '^rpmlib' | cut -f1 -d" ") && \
+    rpm -ivh crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.x86_64.rpm
 WORKDIR /work
+
+FROM rpm-4.14.1-o AS rpm-4.14.1-l
