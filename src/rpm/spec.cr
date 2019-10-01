@@ -245,6 +245,7 @@ module RPM
         xflags.build_amount = build_amount
         xflags.build_root = buildroot.to_unsafe
         xflags.rootdir = rootdir ? rootdir.to_unsafe : null
+        xflags.cookie = null
         pflags = pointerof(xflags).as(LibRPM::BuildArguments)
         rc = LibRPM.rpmSpecBuild(@ptr, pflags)
         if rc == LibRPM::RC::OK
