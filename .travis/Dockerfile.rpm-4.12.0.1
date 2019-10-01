@@ -17,6 +17,7 @@ RUN set -x && \
 WORKDIR /work
 
 FROM rpm-4.12.0.1-base AS rpm-4.12.0.1-l
+WORKDIR /opt
 RUN set -x && \
     curl -LO "${CRYSTAL_ARCHIVE_L}" && \
     xz -dc $(basename "${CRYSTAL_ARCHIVE_L}") | tar -xf -
