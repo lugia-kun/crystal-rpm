@@ -19,7 +19,7 @@ tag=$RPMVERSION-crystal-$CRYSTAL_DIST-$CRYSTAL_VERSION-$CRYSTAL_RELEASE
 docker pull lugiakun/crystal-rpm:$tag
 image_pulled=$?
 if [[ $image_pulled -eq 0 ]]; then
-    image_id="$(docker run -it lugiakun/crystal-rpm:$tag echo -n \${COMMIT_ID})"
+    image_id="$(docker run -it lugiakun/crystal-rpm:$tag sh -c 'echo -n ${COMMIT_ID}')"
 fi
 if [[ "$image_id" ==  "$id" ]]; then
     docker tag lugiakun/crystal-rpm:$tag $RPMVERSION
