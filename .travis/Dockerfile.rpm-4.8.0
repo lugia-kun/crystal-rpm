@@ -20,6 +20,6 @@ WORKDIR /work
 FROM rpm-4.8.0-base AS rpm-4.8.0-l
 RUN set -x && \
     curl -LO "${CRYSTAL_ARCHIVE_L}" && \
-    xz -dc $(basename "${CRYSTAL_ARCHIVE_L}") | tar -xf - && \
+    xz -dc $(basename "${CRYSTAL_ARCHIVE_L}") | tar -xf -
 ENV PATH=/opt/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}/bin:$PATH
 WORKDIR /work
