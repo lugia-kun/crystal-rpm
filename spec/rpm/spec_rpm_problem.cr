@@ -243,7 +243,7 @@ describe RPM::Problem do
 
   describe "#dup" do
     it "can duplicate" do
-      problem = RPM::Problem.create(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+      problem = RPM::Problem.create(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
       d = problem.dup
       d.key.should eq(problem.key)
     end
@@ -252,14 +252,14 @@ describe RPM::Problem do
   {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") >= 0 %}
     describe "#==" do
       it "can compare two problems" do
-        a = RPM::Problem.create(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-        b = RPM::Problem.create(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
+        a = RPM::Problem.create(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
+        b = RPM::Problem.create(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
         (a == b).should be_true
       end
 
       it "can compare two problems" do
-        a = RPM::Problem.create(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 0)
-        b = RPM::Problem.create(RPM::ProblemType::REQUIRES, "bar-1.0-0", "foo.rpm", nil, "", "  Hello", 1)
+        a = RPM::Problem.create(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 0)
+        b = RPM::Problem.create(RPM::ProblemType::REQUIRES, "foo-1.0-0", "foo.rpm", "bar-1.0-0", "Hello", 1)
         (a == b).should be_false
       end
     end
