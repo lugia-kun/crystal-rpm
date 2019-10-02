@@ -151,7 +151,7 @@ describe RPM::Transaction do
           end
         end
         if a_installed_pkg.nil?
-          rpm("-qal").should eq("\n") # no files installed by rpm.
+          rpm("-qal").should eq("") # no files installed by rpm.
         else
           name = a_installed_pkg[RPM::Tag::Name].as(String)
           version = a_installed_pkg[RPM::Tag::Version].as(String)
@@ -623,6 +623,23 @@ describe RPM::Transaction do
           ts.delete(pkg)
           ts.each do |el|
             el.type.should eq(RPM::ElementType::REMOVED)
+          end
+        end
+      rescue e : Exception
+        if e.message != "No packages installed!"
+          raise e
+        end
+        Dir.mktmpdir do |tmproot|
+          install_simple(root: tmproot)
+          RPM.transaction(tmproot) do |ts|
+            pkg = ts.db_iterator do |iter|
+              iter.first?
+            end
+            pkg.should_not be_nil
+            ts.delete(pkg.not_nil!)
+            ts.each do |el|
+              el.type.should eq(RPM::ElementType::REMOVED)
+            end
           end
         end
       end
