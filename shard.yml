@@ -1,7 +1,7 @@
 name: rpm
 version: 0.1.0
 
-dependencies:
+developmment_dependencies:
   tempdir:
     github: lugia-kun/tempdir
 
