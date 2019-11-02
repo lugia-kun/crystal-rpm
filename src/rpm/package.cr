@@ -1,7 +1,8 @@
 require "base64"
 
 module RPM
-  class ChangeLog
+  # Reperesents Changelog data
+  struct ChangeLog
     property time : Time
     property name : String
     property text : String
@@ -13,6 +14,7 @@ module RPM
   class PackageError < Exception
   end
 
+  # RPM Package Header data container
   class Package
     @hdr : LibRPM::Header
 
@@ -146,7 +148,7 @@ module RPM
                   Tag::FileModes, Tag::FileMTimes, Tag::FileRDEVs,
                   Tag::FileLinkTos, Tag::FileDigests, Tag::FileUserName,
                   Tag::FileGroupName}
-          with_tagdata(*tags) do |dirnames, diridxs, sizes, modes, mtimes, rdevs, links, md5s, owners, groups|
+          with_tagdata(*tags) do |dirnames, diridxs, sizes, modes, mtimes, rdevs, links, digests, owners, groups|
             with_tagdata?(Tag::FileStates, Tag::FileFlags) do |states, flags|
               if states
                 # FileStates is stored in CHAR type, but we want
@@ -162,7 +164,7 @@ module RPM
                 mtime = mtimes[i].as(UInt32)
                 rdev = rdevs[i].as(UInt16)
                 link = links[i].as(String)
-                md5 = md5s[i].as(String)
+                digest = digests[i].as(String)
                 owner = owners[i].as(String)
                 group = groups[i].as(String)
                 state = if states
@@ -177,7 +179,7 @@ module RPM
                        end
                 RPM::File.new(
                   path: ::File.join(dirname, basename),
-                  md5sum: md5,
+                  digest: digest,
                   link_to: link,
                   size: size,
                   mtime: Time.unix(mtime),
@@ -216,20 +218,40 @@ module RPM
       dependencies(klass, T.nametag, T.versiontag, T.flagstag)
     end
 
+    # Get the list of "Require" dependencies.
     def requires
       dependencies(Require)
     end
 
+    # Get the list of "Provide" dependencies.
     def provides
       dependencies(Provide)
     end
 
+    # Get the list of "Obsolete" dependencies.
     def obsoletes
       dependencies(Obsolete)
     end
 
+    # Get the list of "Conflict" dependencies.
     def conflicts
       dependencies(Conflict)
+    end
+
+    # Get the list of Changelogs.
+    def changelogs
+      with_tagdata?(Tag::ChangeLogTime, Tag::ChangeLogName, Tag::ChangeLogText) do |timetd, nametd, texttd|
+        if timetd && nametd && texttd
+          Array(ChangeLog).new(timetd.size) do |i|
+            time = timetd[i].as(UInt32)
+            name = nametd[i].as(String)
+            text = texttd[i].as(String)
+            ChangeLog.new(Time.unix(time), name, text)
+          end
+        else
+          [] of ChangeLog
+        end
+      end
     end
 
     # Get `TagData` for given `Tag`.
