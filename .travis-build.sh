@@ -10,7 +10,7 @@ set -x
 export CRYSTAL_VERSION=$(dpkg-query --showformat='${version}' --show crystal || echo "0.30.0-1")
 export CRYSTAL_RELEASE=${CRYSTAL_VERSION#*-}
 export CRYSTAL_VERSION=${CRYSTAL_VERSION%%-*}
-export CRYSTAL_DIST=l
+export CRYSTAL_DIST=o
 export DOCKERFILE=.travis/Dockerfile.$RPMVERSION
 
 id=$(git log -n1 --format=%H -- $DOCKERFILE)
