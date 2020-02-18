@@ -1,7 +1,7 @@
 FROM debian:10 AS debian10
 ARG COMMIT_ID
 ENV COMMIT_ID=${COMMIT_ID}
-ADD crystal.tar /tmp/crystal.tar
+ADD crystal.tar /tmp/
 RUN set -x \
  && export DEBIAN_FRONTEND=noninteractive \
  && apt-get update \
