@@ -1,25 +1,10 @@
-FROM fedora:22 AS rpm-4.12.0.1-base
+FROM fedora:22 AS rpm-4.12.0.1
 ARG COMMIT_ID
 ENV COMMIT_ID=${COMMIT_ID}
-ARG CRYSTAL_VERSION
-ARG CRYSTAL_RELEASE=1
-ENV CRYSTAL_VERSION=${CRYSTAL_VERSION}
-ENV CRYSTAL_RELEASE=${CRYSTAL_RELEASE}
-ENV CRYSTAL_ARCHIVE=https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.x86_64.rpm
-ENV CRYSTAL_ARCHIVE_L=https://github.com/lugia-kun/crystal-for-legacy-dist/releases/download/${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.sles11.x86_64.tar.xz
-RUN dnf install -y rpm-devel rpm-build pkgconfig which curl gcc
-
-FROM rpm-4.12.0.1-base AS rpm-4.12.0.1-o
-RUN set -x && \
-    curl -LO "${CRYSTAL_ARCHIVE}" && \
-    dnf install -y $(rpm -qp $(basename "${CRYSTAL_ARCHIVE}") --requires | egrep -v '^rpmlib' | cut -f1 -d" ") && \
-    rpm -ivh $(basename "${CRYSTAL_ARCHIVE}")
-WORKDIR /work
-
-FROM rpm-4.12.0.1-base AS rpm-4.12.0.1-l
-WORKDIR /opt
-RUN set -x && \
-    curl -LO "${CRYSTAL_ARCHIVE_L}" && \
-    xz -dc $(basename "${CRYSTAL_ARCHIVE_L}") | tar -xf -
-ENV PATH=/opt/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}/bin:$PATH
+WORKDIR /tmp
+ADD crystal.tar
+RUN dnf install -y rpm-devel rpm-build pkgconfig which gcc pcre-devel libevent-devel
+WORKDIR /opt/crystal
+RUN tar xf /tmp/crystal.tar
+ENV PATH=/opt/crystal/bin:${PATH}
 WORKDIR /work

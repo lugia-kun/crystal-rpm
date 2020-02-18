@@ -1,15 +1,13 @@
-FROM debian:10 AS debian10-o
+FROM debian:10 AS debian10
 ARG COMMIT_ID
 ENV COMMIT_ID=${COMMIT_ID}
-ARG CRYSTAL_VERSION
-ARG CRYSTAL_RELEASE=1
-ENV CRYSTAL_ARCHIVE=https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal_${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}_amd64.deb
-RUN set -x && \
-    export DEBIAN_FRONTEND=noninteractive && \
-    apt-get update && \
-    apt-get install -y curl librpm-dev libzstd-dev rpm && \
-    curl -LO "${CRYSTAL_ARCHIVE}" && \
-    dpkg -i $(basename "${CRYSTAL_ARCHIVE}") || apt-get -fy install
+WORKDIR /tmp
+ADD crystal.tar
+RUN set -x \
+ && export DEBIAN_FRONTEND=noninteractive \
+ && apt-get update \
+ && apt-get install -y librpm-dev libzstd-dev rpm gcc pkg-config git tzdata libpcre3-dev libevent-dev libyaml-dev libgmp-dev libssl-dev libxml2-dev
+WORKDIR /opt/crystal
+RUN tar xf /tmp/crystal.tar
+ENV PATH=/opt/crystal/bin:${PATH}
 WORKDIR /work
-
-FROM debian10-o AS debian10-l

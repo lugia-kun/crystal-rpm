@@ -1,13 +1,10 @@
-FROM opensuse/tumbleweed AS opensuse-o
+FROM opensuse/tumbleweed AS opensuse
 ARG COMMIT_ID
 ENV COMMIT_ID=${COMMIT_ID}
-ARG CRYSTAL_VERSION
-ARG CRYSTAL_RELEASE=1
-ENV CRYSTAL_ARCHIVE=https://github.com/crystal-lang/crystal/releases/download/${CRYSTAL_VERSION}/crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.x86_64.rpm
-RUN zypper in -y rpm-build rpm-devel which curl && \
-    curl -LO "${CRYSTAL_ARCHIVE}" && \
-    zypper in -y $(rpm -qp $(basename "${CRYSTAL_ARCHIVE}") --requires | grep -v '^rpmlib' | cut -f1 -d" ") && \
-    rpm -ivh crystal-${CRYSTAL_VERSION}-${CRYSTAL_RELEASE}.x86_64.rpm
+WORKDIR /tmp
+ADD crystal.tar
+RUN zypper in -y rpm-build rpm-devel which gcc pkgconfig pcre-devel libevent-devel
+WORKDIR /opt/crystal
+RUN tar xf /tmp/crystal.tar
+ENV PATH=/opt/crystal/bin:${PATH}
 WORKDIR /work
-
-FROM opensuse-o AS opensuse-l
