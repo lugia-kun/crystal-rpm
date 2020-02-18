@@ -25,7 +25,7 @@ trap "rm -f $workdir/crystal.tar" 0 1 2
 
 
 id=$(git log -n1 --format=%H -- $DOCKERFILE)
-tag=$RPMVERSION-crystal-$CRYSTAL_DIST-$CRYSTAL_VERSION-$CRYSTAL_RELEASE
+tag=$RPMVERSION-crystal-$CRYSTAL_DIST-$CRYSTAL_VERSION-$CRYSTAL_COMMIT
 
 docker pull lugiakun/crystal-rpm:$tag
 image_pulled=$?
@@ -35,7 +35,7 @@ fi
 if [[ "$image_id" ==  "$id" ]]; then
     docker tag lugiakun/crystal-rpm:$tag $RPMVERSION
 else
-    docker build -t $RPMVERSION --target=$RPMVERSION --build-arg CRYSTAL_VERSION=${CRYSTAL_VERSION} --build-arg CRYSTAL_RELEASE=${CRYSTAL_RELEASE} --build-arg COMMIT_ID=$id -f ${DOCKERFILE} . || die "Failed to build ${tag}"
+    docker build -t $RPMVERSION --target=$RPMVERSION --build-arg CRYSTAL_VERSION=${CRYSTAL_VERSION} --build-arg COMMIT_ID=$id -f ${DOCKERFILE} . || die "Failed to build ${tag}"
     if echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin; then
         if [[ -z "$image_id" ]] || [[ $(git log "$image_id..$id" | wc -l) -gt 0 ]]; then
             docker tag $RPMVERSION lugiakun/crystal-rpm:$tag
