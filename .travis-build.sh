@@ -7,7 +7,10 @@ die() {
 
 set -x
 
-export CRYSTAL_VERSION=$(dpkg-query --showformat='${version}' --show crystal || echo "0.30.0-1")
+export CRYSTAL_VERSION=$(crystal eval "puts Crystal::VERSION")
+if [[ "${CRYSTAL_VERSION/-dev/}" != "${CRYSTAL_VERSION}" ]]; then
+  die "Nightly build not supported"
+fi
 export CRYSTAL_RELEASE=${CRYSTAL_VERSION#*-}
 export CRYSTAL_VERSION=${CRYSTAL_VERSION%%-*}
 export CRYSTAL_DIST=o
