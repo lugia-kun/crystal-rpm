@@ -1,4 +1,3 @@
-dist: xenial
 language: crystal
 services:
   - docker
