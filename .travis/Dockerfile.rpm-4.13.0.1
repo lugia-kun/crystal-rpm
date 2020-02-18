@@ -1,7 +1,7 @@
 FROM fedora:26 AS rpm-4.13.0.1
 ARG COMMIT_ID
 ENV COMMIT_ID=${COMMIT_ID}
-ADD crystal.tar /tmp
+ADD crystal.tar /tmp/crystal.tar
 RUN dnf install -y --disablerepo updates rpm-build rpm-devel which gcc pkgconfig pcre-devel libevent-devel
 WORKDIR /opt/crystal
 RUN tar xf /tmp/crystal.tar
