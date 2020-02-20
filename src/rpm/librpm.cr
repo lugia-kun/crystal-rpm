@@ -412,6 +412,8 @@ module RPM
       LongSigSize     = SigBase + 14
       LongArchiveSize = SigBase + 15
       SHA256Header    = SigBase + 17
+      # FILESIGNATURES = SigBase + 18
+      # FILESIGNATURELENGTH = SigBase + 19
 
       Name                        = 1000
       Version                     = 1001
@@ -694,6 +696,9 @@ module RPM
       FileSignatureLength         = 5091
       PayloadDigest               = 5092
       PayloadDigestAlgo           = 5093
+      # AutoInstalled               = 5094
+      # Identity                    = 5095
+      ModularityLabel = 5096
 
       FirstFreeTag
     end
@@ -1053,6 +1058,7 @@ module RPM
     enum ElementType
       ADDED   = (1 << 0)
       REMOVED = (1 << 1)
+      RPMDB   = (1 << 2)
     end
 
     {% begin %}
@@ -1109,23 +1115,26 @@ module RPM
 
     @[Flags]
     enum BuildFlags : RPMFlags
-      NONE          = 0
-      PREP          = (1_u32 << 0)
-      BUILD         = (1_u32 << 1)
-      INSTALL       = (1_u32 << 2)
-      CHECK         = (1_u32 << 3)
-      CLEAN         = (1_u32 << 4)
-      FILECHECK     = (1_u32 << 5)
-      PACKAGESOURCE = (1_u32 << 6)
-      PACKAGEBINARY = (1_u32 << 7)
-      RMSOURCE      = (1_u32 << 8)
-      RMBUILD       = (1_u32 << 9)
-      STRINGBUF     = (1_u32 << 10)
-      RMSPEC        = (1_u32 << 11)
-      FILE_FILE     = (1_u32 << 16)
-      FILE_LIST     = (1_u32 << 17)
-      POLICY        = (1_u32 << 18)
-      NOBUILD       = (1_u32 << 31)
+      NONE               = 0
+      PREP               = (1_u32 << 0)
+      BUILD              = (1_u32 << 1)
+      INSTALL            = (1_u32 << 2)
+      CHECK              = (1_u32 << 3)
+      CLEAN              = (1_u32 << 4)
+      FILECHECK          = (1_u32 << 5)
+      PACKAGESOURCE      = (1_u32 << 6)
+      PACKAGEBINARY      = (1_u32 << 7)
+      RMSOURCE           = (1_u32 << 8)
+      RMBUILD            = (1_u32 << 9)
+      STRINGBUF          = (1_u32 << 10)
+      RMSPEC             = (1_u32 << 11)
+      FILE_FILE          = (1_u32 << 16)
+      FILE_LIST          = (1_u32 << 17)
+      POLICY             = (1_u32 << 18)
+      CHECKBUILDREQUIRES = (1_u32 << 19)
+      BUILDREQUIRES      = (1_u32 << 20)
+      DUMPBUILDREQUIRES  = (1_u32 << 21)
+      NOBUILD            = (1_u32 << 31)
     end
 
     # RPM 4.8 APIs.
@@ -1167,7 +1176,12 @@ module RPM
     fun rpmSpecSrcFlags(SpecSrc) : SourceFlags
     fun rpmSpecSrcNum(SpecSrc) : Int
     fun rpmSpecSrcFilename(SpecSrc) : Pointer(UInt8)
-    fun rpmSpecBuild(Spec, BuildArguments) : RC
+
+    {% if compare_versions(PKGVERSION_COMP, "4.15.0") >= 0 %}
+      fun rpmSpecBuild(Transaction, Spec, BuildArguments) : Int
+    {% else %}
+      fun rpmSpecBuild(Spec, BuildArguments) : RC
+    {% end %}
   end # LibRPM
 
   # Exposed Types

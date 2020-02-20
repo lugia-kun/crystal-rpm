@@ -8,7 +8,9 @@ module RPM
 
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
       @ts : LibRPM::Transaction
-    {% else %}
+    {% end %}
+
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
       @rootdir : String?
       @buildroot : String?
     {% end %}
@@ -223,7 +225,18 @@ module RPM
       header.conflicts
     end
 
-    def build(*, build_amount : BuildFlags, pkg_flags : BuildPkgFlags = BuildPkgFlags::NONE)
+    # Build the package
+    #
+    # Build the package with specified steps in `build_amount`.
+    # Pre-build check and other conditions may be set via `pkg_flags`.
+    # If a `transaction` is given, use it as a transaction while
+    # building the package. `transaction` parameter only affects on
+    # rpm >= 4.15.0. Otherwise it will be ignored. If `transaction` is
+    # not given for rpm >= 4.15.0, this method creates new one.
+    #
+    # If the package built seccessfully, returns true. Otherwise
+    # returns false.
+    def build(*, build_amount : BuildFlags, pkg_flags : BuildPkgFlags = BuildPkgFlags::NONE, transaction : Transaction? = nil)
       build_amount &= ~BuildFlags::RMSPEC
       if build_amount == BuildFlags::NONE
         raise "No build steps given"
@@ -247,12 +260,28 @@ module RPM
         xflags.rootdir = rootdir ? rootdir.to_unsafe : null
         xflags.cookie = null
         pflags = pointerof(xflags).as(LibRPM::BuildArguments)
-        rc = LibRPM.rpmSpecBuild(@ptr, pflags)
-        if rc == LibRPM::RC::OK
-          true
-        else
-          false
-        end
+        {% if compare_versions(PKGVERSION_COMP, "4.15.0") < 0 %}
+          rc = LibRPM.rpmSpecBuild(@ptr, pflags)
+          if rc == LibRPM::RC::OK
+            true
+          else
+            false
+          end
+        {% else %}
+          if transaction
+            ret = LibRPM.rpmSpecBuild(transaction, @ptr, pflags)
+          else
+            ts = LibRPM.rpmtsCreate
+            ret = LibRPM.rpmSpecBuild(ts, @ptr, pflags)
+            LibRPM.rpmtsCloseDB(ts)
+            LibRPM.rpmtsFree(ts)
+          end
+          if ret == 0
+            true
+          else
+            false
+          end
+        {% end %}
       {% end %}
     end
 
