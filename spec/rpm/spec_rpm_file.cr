@@ -51,8 +51,8 @@ describe RPM::File do
     it "returns permission structure" do
       time = Time.utc(2019, 1, 1, 12, 0, 0)
       f = RPM::File.new("path", "md5sum", "", 42_u32, time, "owner", "group",
-                        43_u16, 0o100777_u16, RPM::FileAttrs.from_value(44_u32),
-                        RPM::FileState::NORMAL)
+        43_u16, 0o100777_u16, RPM::FileAttrs.from_value(44_u32),
+        RPM::FileState::NORMAL)
       f.permissions.should eq(::File::Permissions.flags(OtherAll, GroupAll, OwnerAll))
     end
   end

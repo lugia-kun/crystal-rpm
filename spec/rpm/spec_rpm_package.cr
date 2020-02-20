@@ -216,9 +216,9 @@ describe RPM::Package do
       pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
       pkg.files.map { |x| x.path }.to_set
         .should eq(Set{
-        "/usr/share/simple/README",
-        "/usr/share/simple/README.es",
-      })
+          "/usr/share/simple/README",
+          "/usr/share/simple/README.es",
+        })
     end
   end
 
