@@ -56,7 +56,9 @@ module RPM
         # by librpm side. This is why we added `@deleter`. If `@ptr`
         # is created by `rpmtdDup` (or maybe some other methods),
         # `rpmtdFreeData` deallocates allocated data by them.
-        LibRPM.rpmtdFreeData(@ptr)
+        unless @ptr.null?
+          LibRPM.rpmtdFreeData(@ptr)
+        end
         @ptr = LibRPM.rpmtdFree(@ptr)
         if (deleter = @deleter)
           deleter.call
