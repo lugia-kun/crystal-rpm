@@ -769,7 +769,7 @@ module RPM
 
     # These two functions are added on 4.9.0
     # Use RPM#tag_type and RPM#tag_get_return_type instead.
-    fun rpmTagType(TagVal) : TagType
+    fun rpmTagGetTagType(TagVal) : TagType
     fun rpmTagGetReturnType(TagVal) : TagReturnType
 
     # ## Header APIs.
@@ -1246,11 +1246,11 @@ module RPM
 
   # Return Tag Type for a Tag
   #
-  # * Calls `rpmTagType()` for RPM 4.9 or later,
+  # * Calls `rpmTagGetTagType()` for RPM 4.9 or later,
   # * Calls `rpmTagGetType()` and mask for RPM 4.8
   def self.tag_type(v) : TagType
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
-      LibRPM.rpmTagType(v)
+      LibRPM.rpmTagGetTagType(v)
     {% else %}
       m = LibRPM.rpmTagGetType(v)
       TagType.new((m & ~TagReturnType::MASK.value).to_i32)
