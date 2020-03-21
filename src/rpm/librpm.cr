@@ -934,6 +934,16 @@ module RPM
 
     # ## TagData APIs.
 
+    @[Flags]
+    enum TagDataFlags : UInt32
+      NONE       = 0
+      ALLOCED    = (1 << 0)
+      PTRALLOCED = (1 << 1)
+      IMMUTABLE  = (1 << 2)
+      ARGV       = (1 << 3)
+      INVALID    = (1 << 4)
+    end
+
     fun rpmtdNew : TagData
     fun rpmtdFree(TagData) : TagData
     fun rpmtdReset(TagData) : TagData
@@ -942,7 +952,8 @@ module RPM
     fun rpmtdTag(TagData) : TagVal
     fun rpmtdType(TagData) : TagType
     fun rpmtdSetIndex(TagData, Int) : Int
-    fun rpmtdGetIndex(TagData, Int) : Int
+    fun rpmtdGetIndex(TagData) : Int
+    fun rpmtdGetFlags(TagData) : TagDataFlags
 
     fun rpmtdInit(TagData) : LibC::Int
     fun rpmtdNext(TagData) : LibC::Int
@@ -1198,6 +1209,7 @@ module RPM
   alias FileAttrs = LibRPM::FileAttrs
   alias CallbackType = LibRPM::CallbackType
 
+  alias TagDataFlags = LibRPM::TagDataFlags
   alias TagDataFormat = LibRPM::TagDataFormat
 
   alias Sense = LibRPM::Sense
@@ -1210,6 +1222,27 @@ module RPM
 
   alias BuildPkgFlags = LibRPM::BuildPkgFlags
   alias BuildFlags = LibRPM::BuildFlags
+
+
+  # Return TagType in the TagData pointer.
+  #
+  # * Returns the value returned by `rpmtdType` as-is for RPM 4.9 or
+  #   later.
+  # * Returns the value filtered out return type from returned value
+  #   of `rpmtdType` for RPM 4.8.
+  def self.rpmtd_type(ptr) : TagType
+    {% if compare_versions(PKGVERSION_COMP, "4.9.0") >= 0 %}
+      LibRPM.rpmtdType(ptr)
+    {% else %}
+      # `rpmtdFrom*` functions filters out return type from
+      # `rpmGetTagType` function for setting `type` member of
+      # `rpmtd`, but some functions also filters out return type
+      # from the returned value of `rpmtdType`. So we also filters
+      # out the return type.
+      m = LibRPM.rpmtdType(ptr).value
+      TagType.new((m & ~TagReturnType::MASK.value).to_i32)
+    {% end %}
+  end
 
   # Return Tag Type for a Tag
   #

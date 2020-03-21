@@ -7,9 +7,7 @@ describe RPM::TagData do
     it "raises TypeCastError for UInt8 Array" do
       data = RPM::TagData.create([0_u8, 1_u8], RPM::Tag::FileStates)
       data.force_return_type!(RPM::TagData::ReturnTypeInt8)
-      expect_raises(TypeCastError, "Cannot take byte array of UInt8") do
-        data.bytes.should eq(Slice[0_u8, 1_u8])
-      end
+      data.bytes.should eq(Slice[0_u8, 1_u8])
     end
 
     it "can take binary array of Char Array" do
