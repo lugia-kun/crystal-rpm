@@ -1,5 +1,20 @@
 module RPM
   # Stores one RPM TagData.
+  #
+  # There are multiple similar methods available for getting value(s).
+  #
+  # * `#value` returns a value for non-array tag, an array for array tag,
+  #   and a slice for binary tag.
+  # * `#value_no_array` returns a value for non-array tag and a slice
+  #   for binary tags, but raises an exception for array tag.
+  # * `#value_array` returns an array for array tag and a slice for
+  #   binary tags, but raises an exception for non-array tag.
+  # * `#to_a` returns an array for both non-array and array tags, and
+  #   an array of single slice for binary tag.
+  # * `#[]` can be used for getting value at specific index for array tag,
+  #   but `td[0]` is also available for non-array and binary tag.
+  # * `#value?` `#value_no_array?` `#value_array?` `#[]?` returns
+  #   `nil` instead of raising an exception.
   class TagData
     # Handy module to define methods in `ReturnType` classes.
     module ReturnTypeModule
@@ -879,7 +894,7 @@ module RPM
         raise TypeCastError.new("RPM::TagData stores non-array data")
       end
 
-      self.to_a
+      @ptr.to_a
     end
 
     # Returns the value in array.
@@ -894,7 +909,7 @@ module RPM
         return nil
       end
 
-      self.to_a
+      @ptr.to_a
     end
 
     # Returns the value.
@@ -904,7 +919,7 @@ module RPM
       end
 
       if is_array?
-        self.to_a
+        @ptr.to_a
       else
         self[0]
       end
@@ -917,10 +932,14 @@ module RPM
       end
 
       if is_array?
-        self.to_a
+        @ptr.to_a
       else
         self[0]?
       end
+    end
+
+    def to_a
+      @ptr.to_a
     end
 
     def finalize

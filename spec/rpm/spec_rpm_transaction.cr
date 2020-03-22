@@ -141,7 +141,8 @@ describe RPM::Transaction do
         RPM.transaction do |ts|
           ts.db_iterator do |iter|
             iter.each do |x|
-              if (has_files = x[RPM::Tag::BaseNames]).is_a?(Array(String))
+              has_files = x[RPM::Tag::BaseNames]?
+              if has_files && has_files.is_a?(Array(String))
                 if has_files.size > 0
                   a_installed_pkg = x
                   break
@@ -151,7 +152,7 @@ describe RPM::Transaction do
           end
         end
         if a_installed_pkg.nil?
-          rpm("-qal").should eq("") # no files installed by rpm.
+          (rpm("-qal") || [1]).should be_empty # no files installed by rpm.
         else
           name = a_installed_pkg[RPM::Tag::Name].as(String)
           version = a_installed_pkg[RPM::Tag::Version].as(String)
