@@ -7,9 +7,7 @@ describe RPM::TagData do
     it "raises TypeCastError for UInt8 Array" do
       data = RPM::TagData.create([0_u8, 1_u8], RPM::Tag::FileStates)
       data.force_return_type!(RPM::TagData::ReturnTypeInt8)
-      expect_raises(TypeCastError, "Cannot take byte array of UInt8") do
-        data.bytes.should eq(Slice[0_u8, 1_u8])
-      end
+      data.bytes.should eq(Slice[0_u8, 1_u8])
     end
 
     it "can take binary array of Char Array" do
@@ -757,6 +755,15 @@ describe RPM::TagData do
         data = RPM::TagData.create(Slice[1_u8, 2_u8], RPM::Tag::SigMD5)
         data[0].should eq(Bytes[1, 2])
       end
+
+      it "can be used without copying, but it would be shared" do
+        ary = Slice[1_u8, 2_u8]
+        data = RPM::TagData.create(ary, RPM::Tag::SigMD5, copy: false)
+        data[0].should eq(Bytes[1, 2])
+        ary[1] = 3_u8
+        data[0].should eq(Bytes[1, 3])
+        ary[0] = 1_u8 # to avoid garbage collection
+      end
     end
 
     describe "UInt16" do
@@ -784,6 +791,15 @@ describe RPM::TagData do
       it "can be used for creating Array of UInt16 data" do
         data = RPM::TagData.create([1_u16], RPM::Tag::FileModes)
         data[0].should eq(1_u16)
+      end
+
+      it "can be used without copying, but it would be shared" do
+        ary = Slice[1_u16, 2_u16]
+        data = RPM::TagData.create(ary, RPM::Tag::FileModes, copy: false)
+        data[1].should eq(2_u16)
+        ary[1] = 3_u16
+        data[1].should eq(3_u16)
+        ary[1] = 1_u16 # to avoid garbage collection
       end
     end
 
@@ -818,6 +834,15 @@ describe RPM::TagData do
         data = RPM::TagData.create([1_u32], RPM::Tag::FileSizes)
         data[0].should eq(1_u32)
       end
+
+      it "can be used without copying, but it would be shared" do
+        ary = Slice[1_u32, 2_u32]
+        data = RPM::TagData.create(ary, RPM::Tag::FileSizes, copy: false)
+        data[1].should eq(2_u32)
+        ary[1] = 3_u32
+        data[1].should eq(3_u32)
+        ary[1] = 1_u32 # to avoid garbage collection
+      end
     end
 
     describe "UInt64" do
@@ -845,6 +870,15 @@ describe RPM::TagData do
       it "can be used for creating Array of UInt64 data" do
         data = RPM::TagData.create([1_u64], RPM::Tag::LongFileSizes)
         data[0].should eq(1_u64)
+      end
+
+      it "can be used without copying, but it would be shared" do
+        ary = Slice[1_u64, 2_u64]
+        data = RPM::TagData.create(ary, RPM::Tag::LongFileSizes, copy: false)
+        data[1].should eq(2_u64)
+        ary[1] = 3_u64
+        data[1].should eq(3_u64)
+        ary[1] = 1_u64 # to avoid garbage collection
       end
     end
 
@@ -879,6 +913,13 @@ describe RPM::TagData do
         data = RPM::TagData.create(["name"], RPM::Tag::BaseNames)
         data[0].should eq("name")
       end
+    end
+  end
+
+  describe "#to_unsafe" do
+    it "returns rpmtd pointer" do
+      data = RPM::TagData.create(1_u32, RPM::Tag::Epoch)
+      data.to_unsafe.is_a?(RPM::LibRPM::RPMTd).should be_true
     end
   end
 end
