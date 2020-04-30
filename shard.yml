@@ -8,6 +8,6 @@ development_dependencies:
 authors:
   - Hajime Yoshimori <lugia.kun@gmail.com>
 
-crystal: 0.27.0
+crystal: 0.34.0
 
 license: MIT

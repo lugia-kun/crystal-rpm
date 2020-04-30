@@ -78,9 +78,9 @@ module RPM
   end
 
   # Allocation Error occured within librpm API
-  class AllocationError < Errno
-    def initialize(name : String)
-      super(name, Errno::ENOMEM)
+  class AllocationError < Exception
+    def initialize(message)
+      super(message + ": Allocation failed")
     end
   end
 end

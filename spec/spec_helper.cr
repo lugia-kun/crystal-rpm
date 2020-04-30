@@ -68,7 +68,7 @@ end
 {% end %}
 
 def is_chroot_possible?
-  (LibC.chroot("/") == 0).tap { |f| (!f) ? Errno.value = 0 : nil }
+  (LibC.chroot("/") == 0).tap { |f| (!f) ? Errno.value = Errno::NONE : nil }
 end
 
 {% if flag?("verbose_debug_log") %}

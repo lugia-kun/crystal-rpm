@@ -16,8 +16,8 @@ describe "Files" do
             info = File.info(fp, follow_symlinks: false)
             next unless info.symlink?
             tg = File.real_path(fp)
-          rescue e : Errno
-            if e.errno != Errno::ENOENT
+          rescue e : RuntimeError
+            if e.os_error != Errno::ENOENT
               raise e
             end
             next
@@ -27,8 +27,8 @@ describe "Files" do
           end
         end
       end
-    rescue e : Errno
-      if e.errno != Errno::ENOENT
+    rescue e : RuntimeError
+      if e.os_error != Errno::ENOENT
         raise e
       else
         STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
