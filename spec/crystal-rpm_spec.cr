@@ -4,8 +4,7 @@ require "./rpm/**"
 describe "Files" do
   {% if !flag?("skip_openfile_test") %}
     it "should not be opened" do
-      pid = Process.pid
-      path = "/proc/#{pid}/fd"
+      path = "/proc/self/fd"
       dbpath = RPM["_dbpath"]
       cwd = File.dirname(__FILE__)
       # system("ls", ["-l", path])
@@ -16,10 +15,7 @@ describe "Files" do
             info = File.info(fp, follow_symlinks: false)
             next unless info.symlink?
             tg = File.real_path(fp)
-          rescue e : RuntimeError
-            if e.os_error != Errno::ENOENT
-              raise e
-            end
+          rescue File::NotFoundError
             next
           end
           if tg.starts_with?(dbpath) || tg.starts_with?(cwd)
@@ -27,12 +23,8 @@ describe "Files" do
           end
         end
       end
-    rescue e : RuntimeError
-      if e.os_error != Errno::ENOENT
-        raise e
-      else
-        STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
-      end
+    rescue File::NotFoundError
+      STDERR.puts "/proc filesystem not found or not mounted. Skipping open-files check"
     end
   {% else %}
     pending "should not be opened (`-Dskip_openfile_test` is given)"
