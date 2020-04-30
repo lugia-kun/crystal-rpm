@@ -36,6 +36,8 @@ module RPM
         when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
           pkg_nevr, str, alt_nevr = alt_nevr, pkg_nevr, "  " + str.not_nil!
           number = (number == 0) ? 1 : 0
+        else
+          # NOP
         end
         pkg_nevr = nil_ptr(Pointer(UInt8), pkg_nevr)
         alt_nevr = nil_ptr(Pointer(UInt8), alt_nevr)
@@ -91,6 +93,8 @@ module RPM
         when ProblemType::REQUIRES, ProblemType::CONFLICT, ProblemType::OBSOLETES
           str, alt_nevr, pkg_nevr = alt_nevr.not_nil![2..-1], pkg_nevr, str
           number = (number != 0) ? 0 : 1
+        else
+          # NOP
         end
         pkg_nevr = nil_ptr(Pointer(UInt8), pkg_nevr)
         alt_nevr = nil_ptr(Pointer(UInt8), alt_nevr)
