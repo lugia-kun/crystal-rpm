@@ -965,10 +965,6 @@ module RPM
       format(io, TagDataFormat::STRING)
     end
 
-    def to_s
-      format(TagDataFormat::STRING)
-    end
-
     # Format a single value of tag data in given tag data format, and
     # return it.
     def format1(fmt : TagDataFormat)
