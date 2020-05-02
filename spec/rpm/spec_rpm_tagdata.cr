@@ -165,7 +165,18 @@ describe RPM::TagData do
     it "can format binary data" do
       data = RPM::TagData.create(Bytes[0_u8, 1_u8], RPM::Tag::SigMD5)
       data.format(RPM::TagDataFormat::STRING).should eq("0001")
-      data.format(RPM::TagDataFormat::SHESCAPE).should eq("'(null)'")
+
+      # # RPM 4.8 uses `printf`-like function to format, so the result
+      # # is `(null)`. Later, on RPM 4.10, it was replaced with
+      # # `strdup`-like function to format, so it causes a segmentation
+      # # fault. And more later, on RPM 4.14, this bug was fixed, but the
+      # # result is changed to `(invalid type)`.
+      # #
+      # # crystal-rpm skips this check because some supporting RPM
+      # # versions buggy for this operation.
+      #
+      # data.format(RPM::TagDataFormat::SHESCAPE).should eq("'(null)'")
+
       data.format(RPM::TagDataFormat::PGPSIG).should eq("(not an OpenPGP signature)")
       data.format(0, RPM::TagDataFormat::STRING).should eq("0001")
     end

@@ -1223,7 +1223,6 @@ module RPM
   alias BuildPkgFlags = LibRPM::BuildPkgFlags
   alias BuildFlags = LibRPM::BuildFlags
 
-
   # Return TagType in the TagData pointer.
   #
   # * Returns the value returned by `rpmtdType` as-is for RPM 4.9 or
