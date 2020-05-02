@@ -43,6 +43,125 @@ describe RPM::TagData do
     end
   end
 
+  describe "#format" do
+    it "can format string data" do
+      data = RPM::TagData.create("name sp", RPM::Tag::Name)
+      data.format(RPM::TagDataFormat::STRING).should eq("name sp")
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq("'name sp'")
+      data.format(RPM::TagDataFormat::HEX).should eq("(not a number)")
+      data.format(RPM::TagDataFormat::OCTAL).should eq("(not a number)")
+      data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+    end
+
+    it "can format UInt32 data" do
+      data = RPM::TagData.create(999_u32, RPM::Tag::Epoch)
+      data.format(RPM::TagDataFormat::STRING).should eq("999")
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq("999")
+      data.format(RPM::TagDataFormat::HEX).should eq("3e7")
+      data.format(RPM::TagDataFormat::OCTAL).should eq("1747")
+      data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+    end
+
+    it "can format array of string data" do
+      data = RPM::TagData.create(["aa", "bb", "c d"], RPM::Tag::BaseNames)
+      data.format(RPM::TagDataFormat::STRING).should eq(<<-EOD)
+      [aa, bb, c d]
+      EOD
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq(<<-EOD)
+      ['aa', 'bb', 'c d']
+      EOD
+      data.format(RPM::TagDataFormat::HEX).should eq(<<-EOD)
+      [(not a number), (not a number), (not a number)]
+      EOD
+      data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
+      [(not a number), (not a number), (not a number)]
+      EOD
+      data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+    end
+
+    it "can format array of UInt8 data" do
+      data = RPM::TagData.create([0_u8, 1_u8, 44_u8], RPM::Tag::FileStates)
+      data.force_return_type!(RPM::TagData::ReturnTypeInt8)
+      data.format(RPM::TagDataFormat::STRING).should eq(<<-EOD)
+      [0, 1, 44]
+      EOD
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq(<<-EOD)
+      [0, 1, 44]
+      EOD
+      data.format(RPM::TagDataFormat::HEX).should eq(<<-EOD)
+      [0, 1, 2c]
+      EOD
+      data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
+      [0, 1, 54]
+      EOD
+    end
+
+    it "can format array of UInt16 data" do
+      data = RPM::TagData.create([0_u16, 0o644_u16, 0o2755u16], RPM::Tag::FileModes)
+      data.format(RPM::TagDataFormat::STRING).should eq(<<-EOD)
+      [0, 420, 1517]
+      EOD
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq(<<-EOD)
+      [0, 420, 1517]
+      EOD
+      data.format(RPM::TagDataFormat::HEX).should eq(<<-EOD)
+      [0, 1a4, 5ed]
+      EOD
+      data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
+      [0, 644, 2755]
+      EOD
+      data.format(RPM::TagDataFormat::PERMS).should eq(<<-EOD)
+      [?---------, ?rw-r--r--, ?rwxr-sr-x]
+      EOD
+    end
+
+    it "can format array of UInt32 data" do
+      data = RPM::TagData.create([0_u32, 0x12345678_u32], RPM::Tag::FileSizes)
+      data.format(RPM::TagDataFormat::STRING).should eq(<<-EOD)
+      [0, 305419896]
+      EOD
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq(<<-EOD)
+      [0, 305419896]
+      EOD
+      data.format(RPM::TagDataFormat::HEX).should eq(<<-EOD)
+      [0, 12345678]
+      EOD
+      data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
+      [0, 2215053170]
+      EOD
+    end
+
+    it "can format array of UInt64 data" do
+      data = RPM::TagData.create([1_u64, 0x123456789ab_u64], RPM::Tag::LongFileSizes)
+      data.format(RPM::TagDataFormat::STRING).should eq(<<-EOD)
+      [1, 1250999896491]
+      EOD
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq(<<-EOD)
+      [1, 1250999896491]
+      EOD
+      # data.format(RPM::TagDataFormat::HEX).should eq(<<-EOD)
+      # [1, 456789ab]
+      # EOD
+      # data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
+      # [1, 10531704653]
+      # EOD
+    end
+
+    it "can format binary data" do
+      data = RPM::TagData.create(Bytes[0_u8, 1_u8], RPM::Tag::SigMD5)
+      data.format(RPM::TagDataFormat::STRING).should eq("0001")
+      data.format(RPM::TagDataFormat::SHESCAPE).should eq("'(null)'")
+      data.format(RPM::TagDataFormat::PGPSIG).should eq("(not an OpenPGP signature)")
+    end
+
+    it "raises exception for unknown format type" do
+      data = RPM::TagData.create("foobar", RPM::Tag::Name)
+      expect_raises(NilAssertionError) do
+        data.format(RPM::TagDataFormat.new(9999))
+      end
+    end
+  end
+
   describe "#[]" do
     describe "String" do
       it "returns a value" do

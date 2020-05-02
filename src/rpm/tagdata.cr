@@ -967,6 +967,7 @@ module RPM
 
     # Format a single value of tag data in given tag data format, and
     # return it.
+    @[Deprecated("Use #format")]
     def format1(fmt : TagDataFormat)
       @ptr.format1(fmt)
     end
