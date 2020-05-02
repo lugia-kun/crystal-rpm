@@ -51,6 +51,7 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::HEX).should eq("(not a number)")
       data.format(RPM::TagDataFormat::OCTAL).should eq("(not a number)")
       data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+      data.format(0, RPM::TagDataFormat::STRING).should eq("name sp")
     end
 
     it "can format UInt32 data" do
@@ -60,6 +61,7 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::HEX).should eq("3e7")
       data.format(RPM::TagDataFormat::OCTAL).should eq("1747")
       data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+      data.format(0, RPM::TagDataFormat::STRING).should eq("999")
     end
 
     it "can format array of string data" do
@@ -77,6 +79,9 @@ describe RPM::TagData do
       [(not a number), (not a number), (not a number)]
       EOD
       data.format(RPM::TagDataFormat::PGPSIG).should eq("(not a blob)")
+      data.format(0, RPM::TagDataFormat::STRING).should eq("aa")
+      data.format(1, RPM::TagDataFormat::STRING).should eq("bb")
+      data.format(2, RPM::TagDataFormat::STRING).should eq("c d")
     end
 
     it "can format array of UInt8 data" do
@@ -94,6 +99,9 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
       [0, 1, 54]
       EOD
+      data.format(0, RPM::TagDataFormat::STRING).should eq("0")
+      data.format(1, RPM::TagDataFormat::STRING).should eq("1")
+      data.format(2, RPM::TagDataFormat::STRING).should eq("44")
     end
 
     it "can format array of UInt16 data" do
@@ -113,6 +121,9 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::PERMS).should eq(<<-EOD)
       [?---------, ?rw-r--r--, ?rwxr-sr-x]
       EOD
+      data.format(0, RPM::TagDataFormat::STRING).should eq("0")
+      data.format(1, RPM::TagDataFormat::STRING).should eq("420")
+      data.format(2, RPM::TagDataFormat::STRING).should eq("1517")
     end
 
     it "can format array of UInt32 data" do
@@ -129,6 +140,8 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
       [0, 2215053170]
       EOD
+      data.format(0, RPM::TagDataFormat::STRING).should eq("0")
+      data.format(1, RPM::TagDataFormat::STRING).should eq("305419896")
     end
 
     it "can format array of UInt64 data" do
@@ -145,6 +158,8 @@ describe RPM::TagData do
       # data.format(RPM::TagDataFormat::OCTAL).should eq(<<-EOD)
       # [1, 10531704653]
       # EOD
+      data.format(0, RPM::TagDataFormat::STRING).should eq("1")
+      data.format(1, RPM::TagDataFormat::STRING).should eq("1250999896491")
     end
 
     it "can format binary data" do
@@ -152,12 +167,33 @@ describe RPM::TagData do
       data.format(RPM::TagDataFormat::STRING).should eq("0001")
       data.format(RPM::TagDataFormat::SHESCAPE).should eq("'(null)'")
       data.format(RPM::TagDataFormat::PGPSIG).should eq("(not an OpenPGP signature)")
+      data.format(0, RPM::TagDataFormat::STRING).should eq("0001")
     end
 
     it "raises exception for unknown format type" do
       data = RPM::TagData.create("foobar", RPM::Tag::Name)
       expect_raises(NilAssertionError) do
         data.format(RPM::TagDataFormat.new(9999))
+      end
+    end
+
+    it "raises exception for invalid index" do
+      data = RPM::TagData.create("foobar", RPM::Tag::Name)
+      expect_raises(IndexError) do
+        data.format(-1, RPM::TagDataFormat::STRING)
+      end
+      expect_raises(IndexError) do
+        data.format(1, RPM::TagDataFormat::STRING)
+      end
+    end
+
+    it "raises exception for invalid index" do
+      data = RPM::TagData.create(["foobar", "blahblah"], RPM::Tag::BaseNames)
+      expect_raises(IndexError) do
+        data.format(-1, RPM::TagDataFormat::STRING)
+      end
+      expect_raises(IndexError) do
+        data.format(2, RPM::TagDataFormat::STRING)
       end
     end
   end

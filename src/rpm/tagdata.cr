@@ -93,13 +93,20 @@ module RPM
       end
 
       # Set current index of TagData.
+      #
+      # Raises IndexError for invalid index
       private def pos=(idx)
         raise NilAssertionError.new if @ptr.null?
-        LibRPM.rpmtdSetIndex(@ptr, idx)
+        ret = LibRPM.rpmtdSetIndex(@ptr, idx)
+        if ret < 0
+          raise IndexError.new
+        end
+        idx
       end
 
       # Format the TagData at current index in given format.
-      def format1(fmt : TagDataFormat)
+      def format(index : Int, fmt : TagDataFormat)
+        self.pos = index
         s = LibRPM.rpmtdFormat(@ptr, fmt, nil)
         if s.null?
           raise NilAssertionError.new("rpmtdFormat returned NULL")
@@ -111,6 +118,11 @@ module RPM
         end
       end
 
+      # `#format` and write to IO
+      def format(io : IO, index : Int, fmt : TagDataFormat)
+        io << format(index, fmt)
+      end
+
       # Format the TagData to a string also represents array and empty
       # TagData, and send to given IO.
       def format(io : IO, fmt : TagDataFormat)
@@ -118,21 +130,19 @@ module RPM
         if count < 1
           io << "(Empty RPM::TagData)"
         elsif count > 1
-          self.pos = 0
-          zero = format1(fmt)
+          zero = format(0, fmt)
           if zero == "(not a blob)"
             io << zero
           else
             io << "[" << zero
             (1...count).each do |i|
-              self.pos = i
-              io << ", " << format1(fmt)
+              io << ", "
+              format(io, i, fmt)
             end
             io << "]"
           end
         else
-          self.pos = 0
-          io << format1(fmt)
+          format(io, 0, fmt)
         end
       end
 
@@ -163,12 +173,16 @@ module RPM
       #
       # Returns `nil` if `#fetch_ptr` returns `NULL`.
       def bytes? : Slice(T)?
-        self.pos = 0
-        ptr = fetch_ptr
-        if ptr.null?
+        if self.size < 1
           nil
         else
-          Slice(T).new(ptr, size, read_only: true)
+          self.pos = 0
+          ptr = fetch_ptr
+          if ptr.null?
+            nil
+          else
+            Slice(T).new(ptr, size, read_only: true)
+          end
         end
       end
 
@@ -455,7 +469,7 @@ module RPM
       #       So `0x` or `0X` prefix is prohibited, which never be
       #       appeared for `TagType::BIN` data.
       def bytes(&block : (String, Char?, Char?) -> _)
-        f = format1(TagDataFormat::STRING)
+        f = format(0, TagDataFormat::STRING)
         if (fsz = f.size) % 2 != 0
           return yield(f, nil, nil)
         end
@@ -965,11 +979,16 @@ module RPM
       format(io, TagDataFormat::STRING)
     end
 
-    # Format a single value of tag data in given tag data format, and
-    # return it.
-    @[Deprecated("Use #format")]
-    def format1(fmt : TagDataFormat)
-      @ptr.format1(fmt)
+    # Format a single value at specified index of tag data in given
+    # tag data format, and return it.
+    def format(io : IO, index : Int, fmt : TagDataFormat) : Void
+      @ptr.format(io, index, fmt)
+    end
+
+    # Format a single value at specified index of tag data in given
+    # tag data format, and return it.
+    def format(index : Int, fmt : TagDataFormat) : String
+      @ptr.format(index, fmt)
     end
 
     # Format tag data in given tag data format, and send to given `io`
