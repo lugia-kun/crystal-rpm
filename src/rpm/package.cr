@@ -103,7 +103,7 @@ module RPM
     def signature
       with_tagdata?(Tag::SigMD5) do |md5|
         if md5
-          md5.format1(TagDataFormat::STRING)
+          md5.format(0, TagDataFormat::STRING)
         else
           "(none)"
         end
