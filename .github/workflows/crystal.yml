@@ -1,0 +1,69 @@
+name: Crystal CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rpmversion: 4.8.0
+            container: centos:6
+          - rpmversion: 4.11.3
+            container: centos:7
+          - rpmversion: 4.12.0.1
+            container: fedora:22
+          - rpmversion: 4.13.0.1
+            container: fedora:26
+            extra_install_option: --disablerepo updates
+          - rpmversion: 4.13.1
+            container: fedora:26
+          - rpmversion: 4.14.1
+            container: fedora:27
+          - rpmversion: 4.14.2.1
+            container: fedora:28
+          - rpmversion: 4.14.3
+            container: centos:8
+          - rpmversion: 4.15.1
+            container: fedora:31
+          - rpmversion: 4.16.1.2
+            container: fedora:33
+
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install external dependencies
+      run: |
+        pkgs_to_install="rpm-build rpm-devel pkgconfig gcc git"
+        if [[ "${{ matrix.container }}" == "centos:6" ]]; then
+          sed -r -i -f - /etc/yum.repos.d/CentOS-*.repo <<-"EOF"
+          s/^mirrorlist=(https?:\/\/mirrorlist\.centos\.org)/#mirrorlist=\1/
+          s/^#baseurl=(https?:\/\/)mirror\.centos\.org/baseurl=\1vault.centos.org/
+        EOF
+          yum install -y http://opensource.wandisco.com/centos/6/git/x86_64/wandisco-git-release-6-1.noarch.rpm
+        fi
+        if type dnf 1>/dev/null 2>/dev/null; then
+          dnf install ${{ matrix.extra_install_option }} -y ${pkgs_to_install}
+        else
+          yum install ${{ matrix.extra_install_option }} -y ${pkgs_to_install}
+        fi
+    - name: Check RPM version to expected one
+      run: |
+        rpm --version
+        test -z "${{ matrix.rpmversion }}" -o "RPM version ${{ matrix.rpmversion }}" == "`LANG=C rpm --version`"
+    - name: Install Crystal
+      run: curl -fsSL https://crystal-lang.org/install.sh | bash
+    - name: Install crystal dependencies
+      run: shards install -v
+    - name: Run tests
+      run: crystal spec

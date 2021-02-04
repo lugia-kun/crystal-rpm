@@ -1,7 +1,0 @@
-FROM fedora:22 AS rpm-4.12.0.1
-ARG COMMIT_ID
-ENV COMMIT_ID=${COMMIT_ID}
-ADD crystal.tar /opt/crystal
-RUN dnf install -y rpm-devel rpm-build pkgconfig which gcc pcre-devel libevent-devel
-ENV PATH=/opt/crystal/bin:${PATH}
-WORKDIR /work

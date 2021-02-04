@@ -1,7 +1,0 @@
-FROM opensuse/tumbleweed AS opensuse
-ARG COMMIT_ID
-ENV COMMIT_ID=${COMMIT_ID}
-ADD crystal.tar /opt/crystal
-RUN zypper in -y rpm-build rpm-devel which gcc pkgconfig pcre-devel libevent-devel
-ENV PATH=/opt/crystal/bin:${PATH}
-WORKDIR /work
