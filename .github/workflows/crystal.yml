@@ -26,7 +26,7 @@ jobs:
             extra_install_option: --disablerepo updates
           - rpmversion: 4.13.1
             container: fedora:26
-          - rpmversion: 4.14.1
+          - rpmversion: 4.14.0
             container: fedora:27
             extra_install_option: --disablerepo updates
           - rpmversion: 4.14.2.1
@@ -58,8 +58,6 @@ jobs:
         else
           yum install ${{ matrix.extra_install_option }} -y ${pkgs_to_install}
         fi
-        # RPM wants that specfiles to be built are owned by a valid owner.
-        useradd -u `stat -c %u spec/data/simple.spec` crystal || :
     - name: Check RPM version to expected one
       run: |
         rpm --version
@@ -69,4 +67,7 @@ jobs:
     - name: Install crystal dependencies
       run: shards install -v
     - name: Run tests
-      run: crystal spec
+      run: |
+        # RPM wants that specfiles to be built are owned by a valid owner.
+        useradd -u `stat -c %u spec/data/simple.spec` crystal || :
+        crystal spec
