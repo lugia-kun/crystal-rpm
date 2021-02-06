@@ -390,7 +390,7 @@ module RPM
           end
         end
       else
-        box = nil
+        box = Pointer(Void).null
         callback = ->(hdr : LibRPM::Header, type : LibRPM::CallbackType, amount : LibRPM::Loff, total : LibRPM::Loff, key : LibRPM::FnpyKey, data : LibRPM::CallbackData) do
           LibRPM.rpmShowProgress(hdr, type, amount, total, key, data)
         end
