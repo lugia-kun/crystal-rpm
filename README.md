@@ -1,4 +1,4 @@
-# crystal-rpm [![Build Status](https://travis-ci.com/lugia-kun/crystal-rpm.svg?branch=master)](https://travis-ci.com/lugia-kun/crystal-rpm)
+# crystal-rpm [![Crystal CI](https://github.com/lugia-kun/crystal-rpm/workflows/Crystal%20CI/badge.svg)](https://github.com/lugia-kun/crystal-rpm/actions?query=workflow%3A%22Crystal+CI%22)
 
 The [RPM](http://rpm.org/) bindings for
 [Crystal](https://crystal-lang.org/) language based on
