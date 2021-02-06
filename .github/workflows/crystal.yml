@@ -57,6 +57,8 @@ jobs:
         else
           yum install ${{ matrix.extra_install_option }} -y ${pkgs_to_install}
         fi
+        # RPM 4.8 wants that specfiles to be built are owned by a valid owner.
+        useradd -u `stat -c %u spec/data/simple.spec` || :
     - name: Check RPM version to expected one
       run: |
         rpm --version
