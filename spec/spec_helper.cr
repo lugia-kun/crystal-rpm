@@ -185,7 +185,7 @@ def rpm(*args, raise_on_failure : Bool = true, env : Process::Env = nil,
     env["LANG"] = "C"
   end
   {% if flag?("print_rpm_command") %}
-  command_to_s(STDERR, "rpm", args, **opts, env: env, output: output, input: input, error: error)
+    command_to_s(STDERR, "rpm", args, **opts, env: env, output: output, input: input, error: error)
   {% end %}
   process = Process.new("rpm", args, **opts, env: env, output: output, input: input, error: error)
   begin

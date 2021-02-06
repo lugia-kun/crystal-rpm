@@ -338,6 +338,7 @@ module RPM
       TRIGGERPREIN  = (1_u32 << 25)
       KEYRING       = (1_u32 << 26)
       CONFIG        = (1_u32 << 28)
+      META          = (1_u32 << 29)
     end
 
     fun rpmdsSingle(TagVal, UInt8*, UInt8*, Sense) : DependencySet
@@ -374,6 +375,7 @@ module RPM
       EXCLUDE   = (1_u32 << 9)
       UNPATCHED = (1_u32 << 10)
       PUBKEY    = (1_u32 << 11)
+      ARTIFACT  = (1_u32 << 12)
     end
 
     enum FileState
@@ -696,9 +698,10 @@ module RPM
       FileSignatureLength         = 5091
       PayloadDigest               = 5092
       PayloadDigestAlgo           = 5093
-      # AutoInstalled               = 5094
-      # Identity                    = 5095
-      ModularityLabel = 5096
+      AutoInstalled               = 5094
+      Identity                    = 5095
+      ModularityLabel             = 5096
+      PayloadDigestAlt            = 5097
 
       FirstFreeTag
     end
@@ -1027,6 +1030,7 @@ module RPM
       NOPOSTTRANS     = (1_u32 << 25)
       NOMD5           = (1_u32 << 27)
       NOFILEDIGEST    = (1_u32 << 27)
+      NOARTIFACTS     = (1_u32 << 29)
       NOCONFIGS       = (1_u32 << 30)
       DEPLOOPS        = (1_u32 << 31)
     end

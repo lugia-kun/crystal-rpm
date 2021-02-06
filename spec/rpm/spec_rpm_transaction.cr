@@ -320,7 +320,7 @@ describe RPM::Transaction do
             names
           end
           {% if flag?("debug_transaction_pattern") %}
-          STDERR.puts "#regexp refenrece pattern \"#{pattern}\", count: #{reference.size}"
+            STDERR.puts "#regexp refenrece pattern \"#{pattern}\", count: #{reference.size}"
           {% end %}
           if reference.size <= 1
             true
