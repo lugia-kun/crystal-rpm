@@ -319,9 +319,9 @@ describe RPM::Transaction do
             end
             names
           end
-          SPEC_DEBUG_LOG.debug {
-            "#regexp refenrece pattern \"#{pattern}\", count: #{reference.size}"
-          }
+          {% if flag?("debug_transaction_pattern") %}
+          STDERR.puts "#regexp refenrece pattern \"#{pattern}\", count: #{reference.size}"
+          {% end %}
           if reference.size <= 1
             true
           else
@@ -792,13 +792,11 @@ describe RPM::Transaction do
         {% if compare_versions(RPM::PKGVERSION_COMP, "4.9.0") < 0 %}
           ret.exit_code.should_not eq(0)
           # We do not assume the message of ld.
-          lines.each do |l|
-            SPEC_DEBUG_LOG.debug do
-              String.build do |s|
-                s << "TransactionError#problems: " << l
-              end
+          {% if flag?("debug_transaction_problem") %}
+            lines.each do |l|
+              STDERR.puts "TransactionError#problems: #{l}"
             end
-          end
+          {% end %}
         {% else %}
           ret.exit_code.should eq(0)
           expected = [

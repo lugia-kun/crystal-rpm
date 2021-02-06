@@ -807,6 +807,7 @@ module RPM
     fun headerPutString(Header, TagVal, UInt8*) : Int
     fun headerPutUint32(Header, TagVal, UInt32*, Count) : Int
     fun headerFormat(Header, UInt8*, ErrorMsg*) : Pointer(UInt8)
+    fun headerGetInstance(Header) : UInt
 
     fun rpmReadPackageFile(Transaction, FD, UInt8*, Header*) : RC
 

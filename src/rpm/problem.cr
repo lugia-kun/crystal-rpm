@@ -165,7 +165,7 @@ module RPM
       def self.for(pkg : Package, key : String? = nil) : PackageInstalled
         key ||= pkg[RPM::Tag::NEVRA].as(String)
         nevr = pkg[RPM::Tag::NEVR].as(String)
-        Problem.create(ProblemType::PKG_INSTALLED, nevr, key, nil, nil, 0).as(PackageInstalled)
+        Problem.create(ProblemType::PKG_INSTALLED, nevr, key, nil, nil, pkg.instance).as(PackageInstalled)
       end
 
       # Create PKG_INSTALLED problem with given package string.

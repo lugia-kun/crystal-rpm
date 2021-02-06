@@ -349,6 +349,14 @@ module RPM
       end
     end
 
+    # Returns header instance
+    #
+    # If this instance is from rpmdb, returns the rpmdb record
+    # number. Otherwise returns 0.
+    def instance
+      LibRPM.headerGetInstance(@hdr)
+    end
+
     # Get the value of given `Tag` directly.
     #
     # Raises `KeyError` if given `Tag` is not found.

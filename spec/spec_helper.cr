@@ -1,7 +1,6 @@
 require "spec"
 require "file_utils"
 require "path"
-require "logger"
 require "tempdir"
 require "../src/rpm"
 
@@ -70,13 +69,6 @@ end
 def is_chroot_possible?
   (LibC.chroot("/") == 0).tap { |f| (!f) ? Errno.value = Errno::NONE : nil }
 end
-
-{% if flag?("verbose_debug_log") %}
-  SPEC_LOG_FILE  = File.basename(__FILE__) + ".log"
-  SPEC_DEBUG_LOG = Logger.new(File.open(SPEC_LOG_FILE, "w"), level: Logger::DEBUG)
-{% else %}
-  SPEC_DEBUG_LOG = Logger.new(STDERR, level: Logger::FATAL)
-{% end %}
 
 def shellescape(io : IO, str : String)
   m = nil
@@ -192,11 +184,9 @@ def rpm(*args, raise_on_failure : Bool = true, env : Process::Env = nil,
     env = env.dup
     env["LANG"] = "C"
   end
-  SPEC_DEBUG_LOG.debug do
-    String.build do |sio|
-      command_to_s(sio, "rpm", args, **opts, env: env, output: output, input: input, error: error)
-    end
-  end
+  {% if flag?("print_rpm_command") %}
+  command_to_s(STDERR, "rpm", args, **opts, env: env, output: output, input: input, error: error)
+  {% end %}
   process = Process.new("rpm", args, **opts, env: env, output: output, input: input, error: error)
   begin
     yield process
@@ -297,7 +287,7 @@ def open_files_check(&block)
     yield
   ensure
     open_files_at_exit = read_fd_entries
-    open_files_at_exit.delete_if do |ent, path|
+    open_files_at_exit.reject! do |ent, path|
       open_files_at_start.has_key?(ent)
     end
     if (sz = open_files_at_exit.size) > 0

@@ -389,12 +389,32 @@ describe RPM::Problem::PackageInstalled do
 
   describe "#to_s" do
     it "returns problem representation" do
-      obj = RPM::Problem::PackageInstalled.for("package-1.0-0")
-      obj.to_s.should eq("package package-1.0-0 is already installed")
+      {% if compare_versions(RPM::PKGVERSION_COMP, "4.16.0") >= 0 %}
+        obj = RPM::Problem::PackageInstalled.for("package-1.0-0")
+        obj.to_s.should eq("package package-1.0-0 is not installed")
 
-      pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
-      obj = RPM::Problem::PackageInstalled.for(pkg)
-      obj.to_s.should eq("package simple-1.0-0 is already installed")
+        pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+        obj = RPM::Problem::PackageInstalled.for(pkg)
+        obj.to_s.should eq("package simple-1.0-0 is not installed")
+      {% else %}
+        obj = RPM::Problem::PackageInstalled.for("package-1.0-0")
+        obj.to_s.should eq("package package-1.0-0 is already installed")
+
+        pkg = RPM::Package.open(fixture("simple-1.0-0.i586.rpm"))
+        obj = RPM::Problem::PackageInstalled.for(pkg)
+        obj.to_s.should eq("package simple-1.0-0 is already installed")
+      {% end %}
+
+      Dir.mktmpdir do |tmproot|
+        install_simple(root: tmproot)
+        RPM.transaction(tmproot) do |ts|
+          pkg = ts.db_iterator(RPM::DbiTag::Name, "simple") do |iter|
+            iter.first
+          end
+          obj = RPM::Problem::PackageInstalled.for(pkg)
+          obj.to_s.should eq("package simple-1.0-0 is already installed")
+        end
+      end
     end
   end
 end
