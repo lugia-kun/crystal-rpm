@@ -1,7 +1,0 @@
-FROM centos:6 AS rpm-4.8.0
-ARG COMMIT_ID
-ENV COMMIT_ID=${COMMIT_ID}
-ADD crystal.tar /opt/crystal
-RUN yum install -y rpm-devel rpm-build pkg-config which gcc pcre-devel libevent2-devel
-ENV PATH=/opt/crystal/bin:${PATH}
-WORKDIR /work
