@@ -237,33 +237,6 @@ size and member offsets if you have a C compiler (optional).
 (i.e., `sudo`) is required to run `crystal spec`, since this spec uses
 `chroot()`.
 
-Alternatively, using Docker is another method to test:
-
-```bash
-     host$ shards install
-     host$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
-     host$ docker run -it -v $(pwd):/work -w /work [version] ./.travis.sh
-```
-
-Or, manually,
-
-```bash
-     host$ shards install
-     host$ docker build -t [version] -f .travis/Dockerfile.rpm-[version] .
-     host$ docker run -it -v $(pwd):/work -w /work [version]
-container# useradd -u $(stat -c %u spec/data/simple.spec) crystal || :
-container# crystal spec [arguments]
-container# exit
-```
-
-Notes:
-
-* Git in CentOS 6 is too old and does not work with shards, so shards
-  should be install on the local.
-* In Fedora and CentOS, rpmbuild or rpmrc or rpmmacro files requires
-  that the spec files must be owned by a valid user, when building
-  RPMs.
-
 ## Contributing
 
 1. Fork it (<https://github.com/lugia-kun/crystal-rpm/fork>)
