@@ -69,5 +69,6 @@ jobs:
     - name: Run tests
       run: |
         # RPM wants that specfiles to be built are owned by a valid owner.
-        useradd -u `stat -c %u spec/data/simple.spec` crystal || :
+        groupadd -g `stat -c %g spec/data/simple.spec` crystal || :
+        useradd -u `stat -c %u spec/data/simple.spec` -g `stat -c %g spec/data/simple.spec` crystal || :
         crystal spec
