@@ -35,7 +35,10 @@ jobs:
             container: centos:8
           - rpmversion: 4.15.1
             container: fedora:31
-          - rpmversion: 4.16.1.2
+          - rpmversion: 4.16.0
+            container: fedora:33
+            extra_install_option: --disablerepo updates
+          - rpmversion: 4.16.1.3
             container: fedora:33
 
     container:
@@ -63,7 +66,36 @@ jobs:
         rpm --version
         test -z "${{ matrix.rpmversion }}" -o "RPM version ${{ matrix.rpmversion }}" == "`LANG=C rpm --version`"
     - name: Install Crystal
-      run: curl -fsSL https://crystal-lang.org/install.sh | bash
+      run: |
+        case "${{ matrix.container }}" in
+        centos:6)
+          REPO=RHEL_6;;
+        fedora:2[1-9]|fedora:30)
+          REPO=CentOS_7;;
+        esac
+        if [[ -z "$REPO" ]]; then
+          curl -fsSL https://crystal-lang.org/install.sh | bash
+        else
+          cat >/etc/yum.repos.d/crystal.repo <<-END
+        [crystal]
+        name=Crystal
+        type=rpm-md
+        baseurl=https://download.opensuse.org/repositories/devel:languages:crystal/${REPO}/
+        gpgcheck=1
+        gpgkey=https://download.opensuse.org/repositories/devel:languages:crystal/${REPO}/repodata/repomd.xml.key
+        enabled=1
+        END
+          if type dnf 1>/dev/null 2>/dev/null; then
+            dnf install -y crystal
+          else
+            yum install -y crystal
+          fi
+          if [[ "${{ matrix.container }}" == "centos:6" ]]; then
+            rpm -e --nodeps libevent-devel libevent-headers
+            yum install -y libevent2-devel
+          fi
+          crystal -v
+        fi
     - name: Install crystal dependencies
       run: shards install -v
     - name: Run tests
