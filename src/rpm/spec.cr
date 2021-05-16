@@ -288,6 +288,7 @@ module RPM
     # Cleanup
     def finalize
       {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        LibRPM.freeSpec(@ptr)
         LibRPM.rpmtsFree(@ts)
       {% else %}
         LibRPM.rpmSpecFree(@ptr)

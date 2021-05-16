@@ -1158,6 +1158,7 @@ module RPM
     fun rpmtsSpec(Transaction) : Spec
     # fun build(Transaction, UInt8*, BuildArguments, UInt8*) : Int
     fun buildSpec(Transaction, Spec, Int, Int) : RC
+    fun freeSpec(Spec)
 
     # RPM 4.9 APIs.
     @[Flags]
