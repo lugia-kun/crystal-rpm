@@ -139,33 +139,13 @@ module RPM
       end
     end
 
-    # Open a specfile and parse it.
-    #
-    # Recommend to use `RPM::Spec.open`.
     {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
-      def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?, rootdir : String? = "/")
-        @filename = specfile
-        ts = LibRPM.rpmtsCreate
-        ret = LibRPM.parseSpec(ts, specfile, rootdir, buildroot, 0, "", nil,
-          flags.anyarch? ? 1 : 0,
-          flags.force? ? 1 : 0)
-        if ret != 0 || ts.null?
-          raise Exception.new("specfile \"#{specfile}\" parsing failed")
-        end
-        spec = LibRPM.rpmtsSpec(ts)
-        @ts = ts
-        @ptr = spec
+      # :nodoc:
+      def initialize(@filename, @ptr, @ts)
       end
     {% else %}
-      def initialize(specfile : String, flags : LibRPM::SpecFlags, buildroot : String?, rootdir : String? = "/")
-        @filename = specfile
-        spec = LibRPM.rpmSpecParse(specfile, flags, buildroot)
-        if spec.null?
-          raise Exception.new("specfile \"#{specfile}\" parsing failed")
-        end
-        @rootdir = rootdir
-        @buildroot = buildroot
-        @ptr = spec
+      # :nodoc:
+      def initialize(@filename, @ptr, @rootdir, @buildroot)
       end
     {% end %}
 
@@ -298,8 +278,27 @@ module RPM
     # Open a specfile
     #
     # This method gives reasonable defaults for each parameters.
-    def self.open(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE | LibRPM::SpecFlags::ANYARCH, buildroot : String? = nil, rootdir : String? = "/")
-      new(specfile, flags, buildroot, rootdir)
+    def self.open(specfile : String, flags : LibRPM::SpecFlags = LibRPM::SpecFlags::FORCE | LibRPM::SpecFlags::ANYARCH, buildroot : String? = nil, rootdir : String? = "/") : Spec
+      {% if compare_versions(PKGVERSION_COMP, "4.9.0") < 0 %}
+        ts = LibRPM.rpmtsCreate
+        ret = LibRPM.parseSpec(ts, specfile, rootdir, buildroot, 0, "", nil,
+                               flags.anyarch? ? 1 : 0,
+                               flags.force? ? 1 : 0)
+        if !ts.null?
+          spec = LibRPM.rpmtsSpec(ts)
+        end
+        if ret != 0 || spec.nil? || spec.null?
+          LibRPM.rpmtsFree(ts)
+          raise Exception.new("specfile \"#{specfile}\" parsing failed")
+        end
+        new(specfile, spec, ts)
+      {% else %}
+        spec = LibRPM.rpmSpecParse(specfile, flags, buildroot)
+        if spec.null?
+          raise Exception.new("specfile \"#{specfile}\" parsing failed")
+        end
+        new(specfile, spec, rootdir, buildroot)
+      {% end %}
     end
   end
 end
