@@ -45,7 +45,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Install external dependencies
       run: |
-        pkgs_to_install="rpm-build rpm-devel pkgconfig gcc git"
+        pkgs_to_install="rpm-build rpm-devel pkgconfig gcc git ruby"
         if [[ "${{ matrix.container }}" == "centos:6" ]]; then
           sed -r -i -f - /etc/yum.repos.d/CentOS-*.repo <<-"EOF"
           s/^mirrorlist=(https?:\/\/mirrorlist\.centos\.org)/#mirrorlist=\1/
@@ -63,7 +63,32 @@ jobs:
         rpm --version
         test -z "${{ matrix.rpmversion }}" -o "RPM version ${{ matrix.rpmversion }}" == "`LANG=C rpm --version`"
     - name: Install Crystal
-      run: curl -fsSL https://crystal-lang.org/install.sh | bash
+      run: |
+        case "${{ matrix.container }}" in
+        centos:6)
+          REPO=RHEL_6;;
+        fedora:2[1-9]|fedora:30)
+          REPO=CentOS_7;;
+        esac
+        if [[ -z "$REPO" ]]; then
+          curl -fsSL https://crystal-lang.org/install.sh | bash
+        else
+          cat >/etc/yum.repos.d/crystal.repo <<-END
+        [crystal]
+        name=Crystal
+        type=rpm-md
+        baseurl=https://download.opensuse.org/repositories/devel:languages:crystal/${REPO}/
+        gpgcheck=1
+        gpgkey=https://download.opensuse.org/repositories/devel:languages:crystal/${REPO}/repodata/repomd.xml.key
+        enabled=1
+        END
+          if type dnf 1>/dev/null 2>/dev/null; then
+            dnf install -y crystal
+          else
+            yum install -y crystal
+          fi
+          crystal -v
+        fi
     - name: Install crystal dependencies
       run: shards install -v
     - name: Run tests
